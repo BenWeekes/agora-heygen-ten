@@ -1,15 +1,15 @@
 /**
- * Finds all Trulience commands in a text string
+ * Finds all video avatar commands in a text string
  * This handles both standalone commands and commands embedded in text
  * 
  * @param {string} text - Text to search for commands
  * @returns {string[]} Array of found commands
  */
-const findTrulienceCommands = (text) => {
+const findVideoAvatarCommands = (text) => {
   if (!text || typeof text !== 'string') return [];
   
   const result = [];
-  let startIndex = text.indexOf("<trl");
+  let startIndex = text.indexOf("<avatar");
   
   while (startIndex >= 0) {
     // Find the end of this command
@@ -20,7 +20,7 @@ const findTrulienceCommands = (text) => {
     if (selfClosingEnd >= 0 && (openingTagEnd < 0 || selfClosingEnd < openingTagEnd + 1)) {
       // It's a self-closing tag
       result.push(text.substring(startIndex, selfClosingEnd + 2));
-      startIndex = text.indexOf("<trl", selfClosingEnd);
+      startIndex = text.indexOf("<avatar", selfClosingEnd);
     } else if (openingTagEnd >= 0) {
       // It's an opening tag, find its closing tag
       const tagName = text.substring(startIndex + 1, text.indexOf(" ", startIndex) || openingTagEnd);
@@ -29,14 +29,14 @@ const findTrulienceCommands = (text) => {
       
       if (closingTagIndex >= 0) {
         result.push(text.substring(startIndex, closingTagIndex + closingTag.length));
-        startIndex = text.indexOf("<trl", closingTagIndex);
+        startIndex = text.indexOf("<avatar", closingTagIndex);
       } else {
         // No closing tag found, must be malformed
-        startIndex = text.indexOf("<trl", openingTagEnd);
+        startIndex = text.indexOf("<avatar", openingTagEnd);
       }
     } else {
       // Malformed tag, move on
-      startIndex = text.indexOf("<trl", startIndex + 1);
+      startIndex = text.indexOf("<avatar", startIndex + 1);
     }
   }
   
@@ -57,7 +57,7 @@ export function processMessageCommands(message, commandHandler, contextId = "") 
   }
   
   // Find all commands in the message
-  const commands = findTrulienceCommands(message);
+  const commands = findVideoAvatarCommands(message);
   if (commands.length === 0) {
     return message;
   }

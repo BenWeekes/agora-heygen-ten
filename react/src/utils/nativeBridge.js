@@ -88,8 +88,8 @@ export class NativeBridge {
     });
   }
 
-  trulienceDetailsUpdated({ avatarId }) {
-    this.emit("trulienceDetailsUpdated", {
+  videoAvatarDetailsUpdated({ avatarId }) {
+    this.emit("videoAvatarDetailsUpdated", {
       avatarId,
     });
   }

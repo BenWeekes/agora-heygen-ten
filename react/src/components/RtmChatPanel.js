@@ -331,7 +331,7 @@ export const RtmChatPanel = ({
         console.error("Error processing RTM message:", error);
       }
     },
-    [agoraConfig.uid, processMessage, urlParams.purechat, isConnectInitiated]
+    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated]
   );
 
   // Initialize MessageEngine for subtitles with message processor

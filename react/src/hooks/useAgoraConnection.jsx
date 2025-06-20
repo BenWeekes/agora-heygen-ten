@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { ConnectionState } from "../utils/connectionState";
 import { useAgoraRTC } from './useAgoraRTC';
 import { useAgoraRTM } from './useAgoraRTM';
+import { pingService } from '../utils/pingService';
 
 /**
  * Hook that combines Agora RTC and RTM functionality for a complete connection management
@@ -15,16 +16,13 @@ export function useAgoraConnection({
   processAndSendMessageToAvatar,
   showToast,
   agoraClientRef,
-  trulienceAvatarRef,
+  videoAvatarRef,
   urlParams,
   isFullyConnected // Add this parameter
 }) {
   const [agentId, setAgentId] = useState(null);
   const abortControllerRef = useRef(null);
   const isEndpointConnectedRef = useRef(false);
-  // Use ref to store agentEndpoint to avoid re-creation on every render
-  const agentEndpointRef = useRef(agentEndpoint);
-  agentEndpointRef.current = agentEndpoint;
   
   // Initialize Agora RTC hook
   const agoraRTC = useAgoraRTC({
@@ -33,7 +31,7 @@ export function useAgoraConnection({
     updateConnectionState,
     showToast,
     agoraClientRef,
-    trulienceAvatarRef
+    videoAvatarRef
   });
   
   // Initialize Agora RTM hook
@@ -78,11 +76,8 @@ export function useAgoraConnection({
         success: true
       };
       
-      // Use the ref value to get the current agentEndpoint
-      const currentAgentEndpoint = agentEndpointRef.current;
-      
       // Early return if no agent endpoint provided
-      if (!currentAgentEndpoint) {
+      if (!agentEndpoint) {
         return result;
       }
       isEndpointConnectedRef.current = false
@@ -118,13 +113,11 @@ export function useAgoraConnection({
       }
 
       // Use the current endpoint from config if available, otherwise use the passed one
-      let endpointToUse = currentAgentEndpoint;
+      let endpointToUse = agentEndpoint;
       if (agoraConfig.endpoint) {        
         endpointToUse = agoraConfig.endpoint;
         console.log(endpointToUse, "Agent endpoint from config");
       }     
-
-
 
       const endpoint = `${endpointToUse}/?${searchParams.toString()}`;
       console.log("Calling agent endpoint:", endpoint);
@@ -167,9 +160,13 @@ export function useAgoraConnection({
         if (shouldConnectAgent && !silentMode) {
           showToast("Connected");
           updateConnectionState(ConnectionState.AGENT_CONNECTED);
+          // Start ping service when agent is connected
+          pingService.start(derivedChannelName);
         } else if (shouldConnectAgent) {
           // Silent mode but still need to update state
           updateConnectionState(ConnectionState.AGENT_CONNECTED);
+          // Start ping service when agent is connected (silent mode)
+          pingService.start(derivedChannelName);
         }
         // In purechat mode (silentMode), we don't show toast or mark agent as connected
       } else {
@@ -210,20 +207,22 @@ export function useAgoraConnection({
       }
       return { success: false };
     }
-  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController]);
+  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController, agentEndpoint]);
 
   const disconnectAgentEndpoint = useCallback(async () => {
     // Abort active api call
     disconnectAbortController()
 
+    // Stop ping service when disconnecting
+    pingService.stop();
+
     // Reset agent ID
     setAgentId(null);
     
     // Send hangup request to agent endpoint if needed
-    const currentAgentEndpoint = agentEndpointRef.current;
-    if (currentAgentEndpoint && agentId && isEndpointConnectedRef.current) {
+    if (agentEndpoint && agentId && isEndpointConnectedRef.current) {
       try {
-        const endpoint = `${currentAgentEndpoint}/?hangup=true&agent_id=${agentId}`;
+        const endpoint = `${agentEndpoint}/?hangup=true&agent_id=${agentId}`;
         console.log("Calling hangup endpoint:", endpoint);
         
         const response = await fetch(endpoint, {
@@ -258,7 +257,7 @@ export function useAgoraConnection({
       }
     }
     
-  }, [agentId, showToast, disconnectAbortController])
+  }, [agentId, showToast, disconnectAbortController, agentEndpoint])
 
   // Connect to both Agora services
   const connectToAgora = useCallback(async () => {
@@ -400,7 +399,7 @@ export function useAgoraConnection({
       await agoraRTM.disconnectFromRtm();
     }
     
-    // Always disconnect from agent endpoint
+    // Always disconnect from agent endpoint (this will stop ping service)
     await disconnectAgentEndpoint()
     
   }, [agoraRTC, agoraRTM, disconnectAgentEndpoint, urlParams.purechat]);

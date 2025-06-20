@@ -10,7 +10,7 @@ import "./skins/WhatsApp.css";
 import "./skins/Dating.css";
 import "./skins/TeamsDark.css";
 import "./skins/FaceTime.css";
-import { AvatarView } from "./components/AvatarView";
+import { VideoAvatarView } from "./components/VideoAvatarView";
 import ContentViewer from "./components/ContentView";
 import { ControlButtons } from "./components/ControlButtons";
 import { InitialLoadingIndicator } from "./components/InitialLoadingIndicator";
@@ -20,7 +20,7 @@ import { useAgoraConnection } from "./hooks/useAgoraConnection";
 import { useAppConfig } from "./hooks/useAppConfig";
 import { useContentManager } from "./hooks/useContentManager";
 import useOrientationListener from "./hooks/useOrientationListener";
-import useTrulienceAvatarManager from "./hooks/useTrulienceAvatarManager";
+import useVideoAvatarManager from "./hooks/useVideoAvatarManager";
 import { connectionReducer, ConnectionState, initialConnectionState, checkIfFullyConnected } from "./utils/connectionState";
 import ConnectScreen from "./components/ConnectScreen";
 import useLayoutState from "./hooks/useLayoutState";
@@ -44,16 +44,17 @@ function App() {
   // Agent endpoint configuration
   const agentEndpoint = process.env.REACT_APP_AGENT_ENDPOINT;
 
-  // Refs for Agora client and Trulience avatar
+  // Refs for Agora client and video avatar
   const agoraClient = useRef(null);
+  const videoAvatarRef = useRef(null);
 
 
-  // App-level config and derived values for initializing Trulience and Agora
+  // App-level config and derived values for initializing video avatar and Agora
   const {
     urlParams,
     agoraConfig,
     setAgoraConfig,
-    trulienceConfig,
+    videoAvatarConfig,
     derivedChannelName,
   } = useAppConfig();
 
@@ -69,20 +70,19 @@ function App() {
     derivedChannelName,
     skinType,
     connectionState: {
-      avatar: connectionState.avatar.wsConnected,
+      avatar: connectionState.avatar.connected,
       agent: connectionState.agent.connected,
       agora: connectionState.agora.connected
     }
   });
 
   
-  // Manage Trulience avatar lifecycle and messaging
+  // Manage video avatar lifecycle and messaging
   const {
     avatarEventHandlers,
     processAndSendMessageToAvatar,
-    resetAvatarToDefault,
-    trulienceAvatarRef
-  } = useTrulienceAvatarManager({
+    resetAvatarToDefault
+  } = useVideoAvatarManager({
     showToast,
     setLoadProgress,
     updateConnectionState,
@@ -105,7 +105,7 @@ function App() {
     showToast,
     agoraClientRef: agoraClient,
     urlParams,
-    trulienceAvatarRef,
+    videoAvatarRef,
     isFullyConnected: isAppConnected
   });
 
@@ -186,7 +186,7 @@ function App() {
 
 
   // Connect Function for normal mode
-  const connectAgoraTrulience = useCallback(async () => {
+  const connectAgoraVideoAvatar = useCallback(async () => {
     // Set app connected state immediately to show the avatar UI
     updateConnectionState(ConnectionState.APP_CONNECT_INITIATED);
     
@@ -194,8 +194,8 @@ function App() {
       contentManager.unlockVideo(); // To fix auto play on iOS
     }
 
-    // We connect avatar on load, so no need to connect trulience avatar explicitly
-    // updateConnectionState(ConnectionState.AVATAR_WS_CONNECTING);
+    // We connect avatar on load, so no need to connect video avatar explicitly
+    // updateConnectionState(ConnectionState.AVATAR_CONNECTING);
     
     // connect Agora
     const result = await agoraConnection.connectToAgora()
@@ -330,10 +330,10 @@ function App() {
         >
           {!isAppConnected && (
             <ConnectScreen
-              avatarId={trulienceConfig.avatarId}
+              avatarId={videoAvatarConfig.avatarId}
               isPureChatMode={isPureChatMode}
               connectionState={connectionState}
-              onConnect={connectAgoraTrulience}
+              onConnect={connectAgoraVideoAvatar}
               onHangUp={handleHangup}
             />
           )}
@@ -365,13 +365,13 @@ function App() {
                     : undefined,
               }}
             >
-              <AvatarView
+              <VideoAvatarView
                 isAppConnected={isAppConnected}
                 isConnectInitiated={isConnectInitiated}
                 isAvatarLoaded={connectionState.avatar.loaded}
                 loadProgress={loadProgress}
-                trulienceConfig={trulienceConfig}
-                trulienceAvatarRef={trulienceAvatarRef}
+                videoAvatarConfig={videoAvatarConfig}
+                videoAvatarRef={videoAvatarRef}
                 eventCallbacks={avatarEventHandlers}
                 isFullscreen={isFullscreen}
                 toggleFullscreen={toggleFullscreen}
@@ -388,7 +388,7 @@ function App() {
                     handleHangup={handleHangup}
                   />
                 )}
-              </AvatarView>
+              </VideoAvatarView>
             </div>
           </div>
         </div>

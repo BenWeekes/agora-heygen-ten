@@ -1,18 +1,16 @@
-// Updated AvatarView.js with integrated toast and purechat support
+// VideoAvatarView.js - Component for displaying video avatar from Agora RTC
 import React from "react";
-import { TrulienceAvatar } from "@trulience/react-sdk"
-import { Toast } from "./Toast";
 
 /**
- * Component to display the Trulience Avatar with integrated toast notifications
+ * Component to display the Video Avatar with integrated toast notifications
  */
-export const AvatarView = ({
+export const VideoAvatarView = ({
   isAppConnected,
   isConnectInitiated,
   isAvatarLoaded,
   loadProgress,
-  trulienceConfig,
-  trulienceAvatarRef,
+  videoAvatarConfig,
+  videoAvatarRef,
   eventCallbacks,
   children,
   isFullscreen,
@@ -56,18 +54,19 @@ export const AvatarView = ({
       )}
 
 
-      {/* Trulience Avatar - hidden when not connected or in purechat mode without connection */}
-      <div className={`trulience-avatar ${(!isAppConnected || (isPureChatMode && !isAppConnected)) ? "hidden" : ""}`}>
-        <TrulienceAvatar
-          key={trulienceConfig.avatarId}
-          url={trulienceConfig.trulienceSDK}
-          ref={trulienceAvatarRef}
-          avatarId={trulienceConfig.avatarId}
-          token={trulienceConfig.avatarToken}
-          eventCallbacks={eventCallbacks}
-          width="100%"
-          height="100%"
-        />
+      {/* Video Avatar container - hidden when not connected or in purechat mode without connection */}
+      <div 
+        className={`video-avatar ${(!isAppConnected || (isPureChatMode && !isAppConnected)) ? "hidden" : ""}`}
+        id="mainvideo"
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          backgroundColor: "#000000"
+        }}
+      >
+        {/* Video elements will be dynamically added here by Agora RTC */}
+        {/* Audio elements will also be added here for audio playback */}
       </div>
 
       {/* Loading overlay - only show if connected but avatar not loaded */}

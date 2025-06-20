@@ -1,11 +1,11 @@
-# Agora-Trulience Avatar Demo
+# Agora Video Avatar Demo
 
-A simple React application that demonstrates integration between Agora RTC and Trulience Avatar SDKs.
+A simple React application that demonstrates integration between Agora RTC and video avatar rendering.
 
 ## Features
 
 - Real-time audio streaming with Agora RTC
-- 3D avatar visualization with Trulience SDK
+- Video avatar display from Agora RTC video streams
 
 ## Getting Started
 
@@ -19,8 +19,8 @@ A simple React application that demonstrates integration between Agora RTC and T
 1. Clone the repository:
 
    ```
-   git clone https://github.com/yourusername/agora-trulience-demo.git
-   cd agora-trulience-demo
+   git clone https://github.com/yourusername/agora-video-avatar-demo.git
+   cd agora-video-avatar-demo
    ```
 
 2. Install dependencies:
@@ -40,11 +40,9 @@ A simple React application that demonstrates integration between Agora RTC and T
    REACT_APP_AGORA_TOKEN=
    REACT_APP_AGORA_UID=
 
-   # Trulience configuration
-   REACT_APP_TRULIENCE_AVATAR_ID=your_avatar_id
-   REACT_APP_TRULIENCE_SDK_URL=https://trulience.com/sdk/trulience.sdk.js
-   REACT_APP_TRULIENCE_AVATAR_TOKEN=your_token
-   REACT_APP_TRULIENCE_PROFILE_BASE=https://www.trulience.com/tg-avatar-photos
+   # Video Avatar configuration
+   REACT_APP_VIDEO_AVATAR_ID=your_avatar_id
+   REACT_APP_VIDEO_AVATAR_PROFILE_BASE=https://your-cdn.com/avatar-photos
    ```
 
 
@@ -63,7 +61,7 @@ The application will be available at [http://localhost:3040](http://localhost:30
 
 1. Open the application in your browser
 2. Click the play button to connect to the Agora channel
-3. The Trulience avatar will appear and animate based on audio input
+3. The video avatar will appear and display video from the RTC stream
 4. Use the microphone button in the bottom right to mute/unmute your microphone
 
 ## Building for Production
@@ -79,7 +77,7 @@ The build files will be created in the `build` directory.
 ## Troubleshooting
 
 - If you encounter audio permission issues, ensure your browser has microphone access
-- If the avatar doesn't load, check your Trulience configuration and network connection
+- If the avatar doesn't load, check your Agora configuration and network connection
 - For connection issues, verify your Agora App ID and token configuration
 
 ## License

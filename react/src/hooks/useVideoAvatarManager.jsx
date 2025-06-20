@@ -1,47 +1,47 @@
 import { useCallback, useMemo, useRef } from "react";
-import { processMessageCommands } from "../utils/trulienceUtils";
+import { processMessageCommands } from "../utils/videoAvatarUtils";
 import { callNativeAppFunction } from "../utils/nativeBridge";
 import { ConnectionState } from "../utils/connectionState";
 
-export default function useTrulienceAvatarManager({
+export default function useVideoAvatarManager({
   showToast,
   setLoadProgress,
   updateConnectionState,
   eventHandler = {}
 }) {
-  const trulienceAvatarRef = useRef(null);
+  const videoAvatarRef = useRef(null);
 
   const eventHandlerRef = useRef();
   eventHandlerRef.current = eventHandler;
 
-  // Trulience Event Handler
+  // Video Avatar Event Handler
   const avatarEventHandlers = useMemo(() => {
     const eventHandler = eventHandlerRef.current
     return ({
     ...eventHandler,
     "auth-success": (data) => {
-      console.log("Auth success:", data);
+      console.log("Avatar auth success:", data);
       eventHandler["auth-success"]?.(data)
-      callNativeAppFunction("trlAuthSuccess", data);
+      callNativeAppFunction("avatarAuthSuccess", data);
     },
     "auth-fail": (data) => {
       showToast("Authentication Failed", data.message, true);
       eventHandler["auth-fail"]?.(data)
-      callNativeAppFunction("trlAuthFail", data);
+      callNativeAppFunction("avatarAuthFail", data);
     },
     "websocket-connect": (data) => {
-      console.log("WebSocket connected:", data);
+      console.log("Avatar WebSocket connected:", data);
       eventHandler["websocket-connect"]?.(data)
-      callNativeAppFunction("trlWebsocketConnect", data);
-      updateConnectionState(ConnectionState.AVATAR_WS_CONNECTED);
+      callNativeAppFunction("avatarWebsocketConnect", data);
+      updateConnectionState(ConnectionState.AVATAR_CONNECTED);
     },
     "websocket-close": (data) => {
       eventHandler["websocket-close"]?.(data)
-      callNativeAppFunction("trlWebsocketClose", data);
+      callNativeAppFunction("avatarWebsocketClose", data);
     },
     "websocket-message": (msg) => {
       eventHandler["websocket-message"]?.(msg)
-      callNativeAppFunction("trlWebsocketMessage", msg);
+      callNativeAppFunction("avatarWebsocketMessage", msg);
     },
     "load-progress": ({ progress, ...details }) => {
       eventHandler["load-progress"]?.({ progress, ...details })
@@ -49,23 +49,23 @@ export default function useTrulienceAvatarManager({
       if (progress >= 1) {
         updateConnectionState(ConnectionState.AVATAR_LOADED);
       }
-      callNativeAppFunction("trlLoadProgress", { progress, ...details });
+      callNativeAppFunction("avatarLoadProgress", { progress, ...details });
     },
     "mic-update": (data) => {
       eventHandler["mic-update"]?.(data)
-      callNativeAppFunction("trlMicUpdate",data)
+      callNativeAppFunction("avatarMicUpdate",data)
     },
     "mic-access": (data) => {
       eventHandler["mic-access"]?.(data)
-      callNativeAppFunction("trlMicAccess", data)
+      callNativeAppFunction("avatarMicAccess", data)
     },
     "speaker-update": (data) => {
       eventHandler["speaker-update"]?.(data)
-      callNativeAppFunction("trlSpeakerUpdate", data)
+      callNativeAppFunction("avatarSpeakerUpdate", data)
     },
-    "trl-chat": (data) => {
-      eventHandler["trl-chat"]?.(data)
-      callNativeAppFunction("trlChat", data)
+    "avatar-chat": (data) => {
+      eventHandler["avatar-chat"]?.(data)
+      callNativeAppFunction("avatarChat", data)
     },
     "avatar-status-update": (data) => {
       eventHandler["avatar-status-update"]?.(data)
@@ -74,21 +74,12 @@ export default function useTrulienceAvatarManager({
 }, [showToast, setLoadProgress, updateConnectionState]);
 
 
-  // Function to send message to Trulience avatar
+  // Function to send message to video avatar (placeholder for now)
   const sendMessageToAvatar = useCallback((message) => {
-    if (trulienceAvatarRef.current) {
-      const trulienceObj = trulienceAvatarRef.current.getTrulienceObject();
-      if (trulienceObj) {
-        console.log("Sending message to Trulience avatar:", message);
-        trulienceObj.sendMessageToAvatar(message);
-        return true;
-      } else {
-        console.warn("Trulience object not available yet");
-      }
-    } else {
-      console.warn("Trulience avatar ref not available");
-    }
-    return false;
+    // For video avatar, we might send messages through RTM or other channels
+    // This is a placeholder implementation
+    console.log("Sending message to video avatar:", message);
+    return true;
   }, []);
 
 
@@ -99,17 +90,13 @@ export default function useTrulienceAvatarManager({
 
 
   const resetAvatarToDefault = useCallback(() => {
-    const avatarObj = trulienceAvatarRef.current?.getTrulienceObject();
-    if (avatarObj) {
-      avatarObj.sendMessageToAvatar("<trl-stop-background-audio immediate='true' />");
-      avatarObj.sendMessageToAvatar("<trl-content position='DefaultCenter' />");
-      console.log("Avatar reset triggered");
-    }
+    // For video avatar, we might send reset commands through RTM or other channels
+    console.log("Avatar reset triggered");
   }, []);
 
 
   return {
-    trulienceAvatarRef,
+    videoAvatarRef,
     avatarEventHandlers,
     sendMessageToAvatar,
     processAndSendMessageToAvatar,

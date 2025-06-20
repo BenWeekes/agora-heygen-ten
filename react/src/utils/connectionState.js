@@ -7,8 +7,8 @@ export const initialConnectionState = {
   avatar: {
     loading: true,
     loaded: false,
-    wsConnecting: false,
-    wsConnected: false,
+    connecting: false,
+    connected: false,
   },
   agent: {
     connecting: false,
@@ -32,9 +32,9 @@ export const ConnectionState = {
   AVATAR_LOADING: 'AVATAR_LOADING',
   AVATAR_LOADED: 'AVATAR_LOADED',
   
-  AVATAR_WS_CONNECTING: 'AVATAR_WS_CONNECTING',
-  AVATAR_WS_CONNECTED: 'AVATAR_WS_CONNECTED',
-  AVATAR_WS_DISCONNECT: 'AVATAR_DISCONNECT',
+  AVATAR_CONNECTING: 'AVATAR_CONNECTING',
+  AVATAR_CONNECTED: 'AVATAR_CONNECTED',
+  AVATAR_DISCONNECT: 'AVATAR_DISCONNECT',
   
   AGENT_CONNECTING: 'AGENT_CONNECTING',
   AGENT_CONNECTED: 'AGENT_CONNECTED',
@@ -55,7 +55,7 @@ export const ConnectionState = {
 // Helper function to compute full connection status
 export function checkIfFullyConnected(state) {
   return (
-    state.avatar.wsConnected &&
+    state.avatar.connected &&
     state.avatar.loaded &&
     state.agent.connected &&
     state.agora.connected
@@ -97,23 +97,23 @@ export function connectionReducer(state, action) {
         avatar: { ...state.avatar, loading: false, loaded: true },
       };
 
-    case ConnectionState.AVATAR_WS_CONNECTING:
+    case ConnectionState.AVATAR_CONNECTING:
       return {
         ...state,
-        avatar: { ...state.avatar, wsConnecting: true },
+        avatar: { ...state.avatar, connecting: true },
       };
 
-    case ConnectionState.AVATAR_WS_CONNECTED: {
+    case ConnectionState.AVATAR_CONNECTED: {
       return {
         ...state,
-        avatar: { ...state.avatar, wsConnecting: false, wsConnected: true },
+        avatar: { ...state.avatar, connecting: false, connected: true },
       };
     }
 
-    case ConnectionState.AVATAR_WS_DISCONNECT:
+    case ConnectionState.AVATAR_DISCONNECT:
       return {
         ...state,
-        avatar: { ...state.avatar, wsConnected: false, wsConnecting: false },
+        avatar: { ...state.avatar, connected: false, connecting: false },
       };
 
 

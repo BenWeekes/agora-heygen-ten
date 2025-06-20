@@ -98,7 +98,7 @@ export const getParamsFromUrl = () => {
 
     return {
       channelName: channelParam || process.env.REACT_APP_AGORA_CHANNEL_NAME,
-      avatarId: avatarIdParam || process.env.REACT_APP_TRULIENCE_AVATAR_ID,
+      avatarId: avatarIdParam || process.env.REACT_APP_VIDEO_AVATAR_ID,
       voice_id: voiceIdParam || null, // Changed from voiceId to voice_id for consistency
       prompt: promptParam || null,
       greeting: greetingParam || null,
@@ -117,7 +117,7 @@ export const getParamsFromUrl = () => {
   }
   return {
     channelName: process.env.REACT_APP_AGORA_CHANNEL_NAME,
-    avatarId: process.env.REACT_APP_TRULIENCE_AVATAR_ID,
+    avatarId: process.env.REACT_APP_VIDEO_AVATAR_ID,
     voice_id: null, // Changed from voiceId to voice_id for consistency
     prompt: null,
     greeting: null,

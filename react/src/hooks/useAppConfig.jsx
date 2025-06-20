@@ -19,10 +19,9 @@ export const useAppConfig = () => {
     endpoint: urlParams.endpoint  ?? process.env.REACT_APP_AGENT_ENDPOINT,
   }));
 
-  const [trulienceConfig, setTrulienceConfig] = useState(() => ({
-    avatarId: urlParams.avatarId ?? process.env.REACT_APP_TRULIENCE_AVATAR_ID,
-    trulienceSDK: process.env.REACT_APP_TRULIENCE_SDK_URL,
-    avatarToken: process.env.REACT_APP_TRULIENCE_AVATAR_TOKEN || null,
+  const [videoAvatarConfig, setVideoAvatarConfig] = useState(() => ({
+    avatarId: urlParams.avatarId ?? process.env.REACT_APP_VIDEO_AVATAR_ID,
+    profileBase: process.env.REACT_APP_VIDEO_AVATAR_PROFILE_BASE || null,
   }));
 
   const derivedChannelName = useMemo(() => {
@@ -64,19 +63,19 @@ export const useAppConfig = () => {
       }));
     };
 
-    const handleTrulienceDetailsUpdated = ({ avatarId }) => {
-      setTrulienceConfig(config => ({ ...config, avatarId }));
+    const handleVideoAvatarDetailsUpdated = ({ avatarId }) => {
+      setVideoAvatarConfig(config => ({ ...config, avatarId }));
     };
 
     if (nativeBridge) {
       nativeBridge.on("agoraDetailsUpdated", handleAgoraDetailsUpdated);
-      nativeBridge.on("trulienceDetailsUpdated", handleTrulienceDetailsUpdated);
+      nativeBridge.on("videoAvatarDetailsUpdated", handleVideoAvatarDetailsUpdated);
     }
 
     return () => {
       if (nativeBridge) {
         nativeBridge.off("agoraDetailsUpdated", handleAgoraDetailsUpdated);
-        nativeBridge.off("trulienceDetailsUpdated", handleTrulienceDetailsUpdated);
+        nativeBridge.off("videoAvatarDetailsUpdated", handleVideoAvatarDetailsUpdated);
       }
     };
   }, [nativeBridge]);
@@ -85,7 +84,7 @@ export const useAppConfig = () => {
     urlParams,
     agoraConfig,
     setAgoraConfig,
-    trulienceConfig,
+    videoAvatarConfig,
     derivedChannelName,
   };
 };

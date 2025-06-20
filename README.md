@@ -1,6 +1,6 @@
 # Overview
 
-This repo includes example code in `react/` and `ios/` that demonstrates how the Agora SDK and the Trulience SDK can be used together and embedded in a native mobile application.
+This repo includes example code in `react/` and `ios/` that demonstrates how the Agora SDK can be used and embedded in a native mobile application to display video avatars.
 
 # Event Passing
 
@@ -12,16 +12,16 @@ The following table describes the events handled in this communication setup, de
 
 | Event Name             | Direction             | Description                                                                              | Parameters                                          |
 | ---------------------- | --------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `trlAuthSuccess`       | React -> iOS / Android | Indicates successful authentication.                                                     | Auth success message                                |
-| `trlAuthFail`          | React -> iOS / Android | Indicates failed authentication.                                                         | Auth fail message                                   |
-| `trlWebsocketConnect`  | React -> iOS / Android | Triggered when WebSocket connects.                                                       | Websocket connect details                           |
-| `trlWebsocketClose`    | React -> iOS / Android | Triggered when WebSocket closes.                                                         | Websocket disconnect details                        |
-| `trlWebsocketMessage`  | React -> iOS / Android | Triggered for WebSocket messages.                                                        | Websocket message                                   |
-| `trlLoadProgress`      | React -> iOS / Android | Updates on load progress.                                                                | `{progress: number}`                                |
-| `trlMicUpdate`         | React -> iOS / Android | Updates related to microphone status.                                                    | None                                                |
-| `trlMicAccess`         | React -> iOS / Android | Triggered on microphone access attempts.                                                 | None                                                |
-| `trlSpeakerUpdate`     | React -> iOS / Android | Updates related to speaker status.                                                       | None                                                |
-| `trlChat`              | React -> iOS / Android | Triggered during chat events.                                                            | None                                                |
+| `avatarAuthSuccess`    | React -> iOS / Android | Indicates successful avatar authentication.                                             | Auth success message                                |
+| `avatarAuthFail`       | React -> iOS / Android | Indicates failed avatar authentication.                                                 | Auth fail message                                   |
+| `avatarWebsocketConnect` | React -> iOS / Android | Triggered when avatar WebSocket connects.                                             | Websocket connect details                           |
+| `avatarWebsocketClose` | React -> iOS / Android | Triggered when avatar WebSocket closes.                                                | Websocket disconnect details                        |
+| `avatarWebsocketMessage` | React -> iOS / Android | Triggered for avatar WebSocket messages.                                              | Websocket message                                   |
+| `avatarLoadProgress`   | React -> iOS / Android | Updates on avatar load progress.                                                        | `{progress: number}`                                |
+| `avatarMicUpdate`      | React -> iOS / Android | Updates related to microphone status.                                                   | None                                                |
+| `avatarMicAccess`      | React -> iOS / Android | Triggered on microphone access attempts.                                                | None                                                |
+| `avatarSpeakerUpdate`  | React -> iOS / Android | Updates related to speaker status.                                                      | None                                                |
+| `avatarChat`           | React -> iOS / Android | Triggered during chat events.                                                           | None                                                |
 | `agoraUserPublished`   | React -> iOS / Android | Triggered when a remote user publishes a media stream (audio/video) to the channel.      | `{user, mediaType}`                                 |
 | `agoraUserUnpublished` | React -> iOS / Android | Triggered when a remote user un-publishes a media stream (audio/video) from the channel. | `{user, mediaType}`                                 |
 | `agoraUserJoined`      | React -> iOS / Android | Indicates that an Agora user has joined a channel.                                       | None                                                |
@@ -73,7 +73,7 @@ In the React application, event are listened to using the `NativeBridge` class:
   First an event is registered in the constructor in `Webview.swift`:
 
   ```swift
-  webView.configuration.userContentController.add(coordinator, name: "trlAuthSuccess")
+  webView.configuration.userContentController.add(coordinator, name: "avatarAuthSuccess")
 
   ```
 
@@ -85,7 +85,7 @@ In the React application, event are listened to using the `NativeBridge` class:
       ...
       */
       func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-              if message.name == "trlAuthSuccess" {
+              if message.name == "avatarAuthSuccess" {
                   // handle event
               }
 
@@ -114,7 +114,7 @@ In the React application, event are listened to using the `NativeBridge` class:
 ### Android
 
 - **Load the Web App Build**  
-  We’ve added a Gradle task that copies the React build into the Android project before building. You can check the copy script in `app/build.gradle.kts`.  
+  We've added a Gradle task that copies the React build into the Android project before building. You can check the copy script in `app/build.gradle.kts`.  
   **Note:** You need to manually build the React app first by running `pnpm build` inside the `react` folder.
 
 - **Subscribe to Events**  
@@ -125,7 +125,7 @@ In the React application, event are listened to using the `NativeBridge` class:
 
       fun userContentController(eventName: String, body: Map<String, Any>?) {
           when (eventName) {
-              "trlAuthSuccess" -> {
+              "avatarAuthSuccess" -> {
                   // Handle authentication success event
               }
               // ...
@@ -136,7 +136,7 @@ In the React application, event are listened to using the `NativeBridge` class:
 
 - **Emit Events**  
   To emit events to the web app, use the `callJavaScriptFunction` helper in the `Coordinator`. Pass the `functionName` and any required parameters.  
-  The `functionName` must match one of the functions defined in the web app’s `NativeBridge` class.
+  The `functionName` must match one of the functions defined in the web app's `NativeBridge` class.
 
   ```kotlin
   fun sendAgoraDetailsToReact(connectionInfo: ConnectionInfo) {
