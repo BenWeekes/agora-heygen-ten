@@ -16,6 +16,7 @@ export function useAgoraRTC({
 }) {
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasReceivedVideo, setHasReceivedVideo] = useState(false);
 
   const initializeAgoraClient = useCallback((
     agoraClientRef,
@@ -57,7 +58,15 @@ export function useAgoraRTC({
         // Play audio track
         user.audioTrack.play(audioNode);
       } else if (mediaType === "video") {
-        console.log("Video track received");
+        console.log("Video track received - this indicates avatar is ready");
+        
+        // Mark that we've received video (avatar is ready)
+        setHasReceivedVideo(true);
+        
+        // Update connection state to indicate avatar is loaded and connected
+        updateConnectionState(ConnectionState.AVATAR_LOADED);
+        updateConnectionState(ConnectionState.AVATAR_CONNECTED);
+        
         // Handle video track - play it in the video avatar container
         let videoNode = document.getElementById("video_" + user.uid);
         if (!videoNode) {
@@ -87,6 +96,10 @@ export function useAgoraRTC({
         if (videoNode) {
           videoNode.remove();
         }
+        
+        // Reset video received state when video stops
+        setHasReceivedVideo(false);
+        updateConnectionState(ConnectionState.AVATAR_DISCONNECT);
       } else if (mediaType === "audio") {
         // Remove the audio element
         const audioNode = document.getElementById("audio_" + user.uid);
@@ -112,6 +125,10 @@ export function useAgoraRTC({
       if (audioNode) {
         audioNode.remove();
       }
+      
+      // Reset states when user leaves
+      setHasReceivedVideo(false);
+      updateConnectionState(ConnectionState.AVATAR_DISCONNECT);
     });
   
     // Cleanup function
@@ -120,7 +137,7 @@ export function useAgoraRTC({
         agoraClientRef.current.leave();
       }
     }
-  }, []);
+  }, [updateConnectionState]);
 
   // Initialize Agora client once
   useEffect(() => {
@@ -148,7 +165,8 @@ export function useAgoraRTC({
     updateConnectionState(ConnectionState.AGORA_CONNECTING);
     
     try {
-        const numericUid = uid ? parseInt(uid, 10) : 0;
+      const numericUid = uid ? parseInt(uid, 10) : 0;
+      
       // Join the channel
       await agoraClientRef.current.join(
         agoraConfig.appId,
@@ -156,7 +174,9 @@ export function useAgoraRTC({
         token,
         numericUid
       );
-      alert(numericUid);
+      
+      console.log("Joined Agora RTC channel successfully with UID:", numericUid);
+      
       (async () => {
         try {
           // Create microphone track
@@ -167,6 +187,7 @@ export function useAgoraRTC({
           await agoraClientRef.current.publish([audioTrack]);
           setIsMuted(false)
         } catch (error) {
+          console.warn("Could not create/publish audio track:", error);
           setIsMuted(true)
         }
       })()
@@ -194,6 +215,9 @@ export function useAgoraRTC({
       setLocalAudioTrack(null);
     }
     
+    // Reset video state
+    setHasReceivedVideo(false);
+    
     // Clean up all video and audio elements
     const mainVideoContainer = document.getElementById("mainvideo");
     if (mainVideoContainer) {
@@ -207,6 +231,7 @@ export function useAgoraRTC({
       try {
         await agoraClientRef.current.leave();
         updateConnectionState(ConnectionState.AGORA_DISCONNECT)
+        updateConnectionState(ConnectionState.AVATAR_DISCONNECT);
       } catch (error) {
         console.error("Error leaving Agora channel:", error);
       }
@@ -227,6 +252,7 @@ export function useAgoraRTC({
   return {
     localAudioTrack,
     isMuted,
+    hasReceivedVideo,
     connectToAgoraRTC,
     disconnectFromAgoraRTC,
     toggleMute,

@@ -54,9 +54,9 @@ export const VideoAvatarView = ({
       )}
 
 
-      {/* Video Avatar container - hidden when not connected or in purechat mode without connection */}
+      {/* Video Avatar container - show when connected (video will appear from Agora RTC) */}
       <div 
-        className={`video-avatar ${(!isAppConnected || (isPureChatMode && !isAppConnected)) ? "hidden" : ""}`}
+        className={`video-avatar ${!isAppConnected ? "hidden" : ""}`}
         id="mainvideo"
         style={{
           width: "100%",
@@ -69,13 +69,14 @@ export const VideoAvatarView = ({
         {/* Audio elements will also be added here for audio playback */}
       </div>
 
-      {/* Loading overlay - only show if connected but avatar not loaded */}
+      {/* Loading overlay - show when connecting but no video received yet */}
+      {/* This will be hidden automatically when video starts coming from Agora */}
       {isConnectInitiated && !isAvatarLoaded && !isPureChatMode && (
         <div className="loading-overlay">
           <div className="progress-bar">
             <div
               className="progress-indicator"
-              style={{ width: `${loadProgress * 100}%` }}
+              style={{ width: `${Math.max(loadProgress * 100, 30)}%` }}
             />
           </div>
         </div>

@@ -5,10 +5,10 @@ export const initialConnectionState = {
     connectInitiated: false
   },
   avatar: {
-    loading: true,
-    loaded: false,
+    loading: false, // Changed: Not loading avatar from external service anymore
+    loaded: false,  // Will be set to true when we receive video from Agora
     connecting: false,
-    connected: false,
+    connected: false, // Will be set to true when we receive video from Agora
   },
   agent: {
     connecting: false,
@@ -53,12 +53,13 @@ export const ConnectionState = {
 };
 
 // Helper function to compute full connection status
+// Updated to reflect that avatar connection now depends on receiving video from Agora
 export function checkIfFullyConnected(state) {
   return (
-    state.avatar.connected &&
-    state.avatar.loaded &&
-    state.agent.connected &&
-    state.agora.connected
+    state.avatar.connected &&  // This will be true when we receive video from Agora
+    state.avatar.loaded &&    // This will be true when we receive video from Agora
+    state.agent.connected &&  // Agent endpoint connected
+    state.agora.connected     // Agora RTC connected
   );
 }
 
@@ -84,7 +85,7 @@ export function connectionReducer(state, action) {
         app: { ...state.app, connectInitiated: true },
       };
 
-    // Avatar state handling
+    // Avatar state handling - now tied to Agora video reception
     case ConnectionState.AVATAR_LOADING:
       return {
         ...state,
@@ -113,7 +114,7 @@ export function connectionReducer(state, action) {
     case ConnectionState.AVATAR_DISCONNECT:
       return {
         ...state,
-        avatar: { ...state.avatar, connected: false, connecting: false },
+        avatar: { ...state.avatar, connected: false, connecting: false, loaded: false },
       };
 
 
@@ -169,20 +170,19 @@ export function connectionReducer(state, action) {
       };
 
     case ConnectionState.DISCONNECTING:
-      // We are not currently resetting avatar state, as we are keeping it loaded.
       return { 
         ...state,
         app: { ...state.app, connectInitiated: false }
       };
 
     case ConnectionState.DISCONNECT:
-      // We are not currently resetting avatar state, as we are keeping it loaded.
       return { 
         ...state,
         app: { ...state.app, connectInitiated: false },
         rtm: { connecting: false, connected: false },
         agent: { connecting: false, connected: false },
-        agora: { connecting: false, connected: false }
+        agora: { connecting: false, connected: false },
+        avatar: { ...state.avatar, connected: false, loaded: false } // Reset avatar state on disconnect
       };
 
     case ConnectionState.RESET_STATE:

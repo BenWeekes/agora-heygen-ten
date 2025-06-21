@@ -77,7 +77,7 @@ function App() {
   });
 
   
-  // Manage video avatar lifecycle and messaging
+  // Manage video avatar lifecycle and messaging (now simplified since no external avatar service)
   const {
     avatarEventHandlers,
     processAndSendMessageToAvatar,
@@ -194,8 +194,9 @@ function App() {
       contentManager.unlockVideo(); // To fix auto play on iOS
     }
 
-    // We connect avatar on load, so no need to connect video avatar explicitly
-    // updateConnectionState(ConnectionState.AVATAR_CONNECTING);
+    // Since we're using Agora RTC directly (no external avatar service),
+    // the avatar will be "ready" when we receive video from Agora RTC
+    // This is handled in the useAgoraRTC hook's user-published event
     
     // connect Agora
     const result = await agoraConnection.connectToAgora()
@@ -263,6 +264,8 @@ function App() {
       agoraClient: !!agoraClient.current,
       rtmClient: !!agoraConnection.rtmClient,
       skin: skinType,
+      avatarConnected: connectionState.avatar.connected,
+      avatarLoaded: connectionState.avatar.loaded,
     });
   }
 
