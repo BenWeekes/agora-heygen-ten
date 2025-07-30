@@ -15,7 +15,7 @@ export function useAgoraRTC({
   videoAvatarRef
 }) {
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted during ringing
   const [hasReceivedVideo, setHasReceivedVideo] = useState(false);
 
   const initializeAgoraClient = useCallback((
@@ -58,7 +58,7 @@ export function useAgoraRTC({
         // Play audio track
         user.audioTrack.play(audioNode);
       } else if (mediaType === "video") {
-        console.log("Video track received - this indicates avatar is ready");
+        console.log("Video track received - this indicates avatar is ready, stopping ring tone");
         
         // Mark that we've received video (avatar is ready)
         setHasReceivedVideo(true);
@@ -89,8 +89,13 @@ export function useAgoraRTC({
   
     // Handle user unpublished event
     agoraClientRef.current.on("user-unpublished", (user, mediaType) => {
-      callNativeAppFunction("agoraUserUnpublished", { user, mediaType });
+     
+      //callNativeAppFunction("agoraUserUnpublished", { user, mediaType });
+      console.log("User unpublished:", user.uid, mediaType);
+       /*
       if (mediaType === "video") {
+        console.log("Remote video unpublished - returning to connect screen");
+        
         // Remove the video element
         const videoNode = document.getElementById("video_" + user.uid);
         if (videoNode) {
@@ -100,21 +105,27 @@ export function useAgoraRTC({
         // Reset video received state when video stops
         setHasReceivedVideo(false);
         updateConnectionState(ConnectionState.AVATAR_DISCONNECT);
+        
+        // Reset connection to prepare for fresh call
+        updateConnectionState(ConnectionState.DISCONNECT);
+        
       } else if (mediaType === "audio") {
         // Remove the audio element
         const audioNode = document.getElementById("audio_" + user.uid);
         if (audioNode) {
           audioNode.remove();
         }
-      }
+      }*/
     });
   
     agoraClientRef.current.on("user-joined", () => {
       callNativeAppFunction("agoraUserJoined");
     });
   
-    agoraClientRef.current.on("user-left", (user) => {
+    agoraClientRef.current.on("user-left", (user) => {/*
       callNativeAppFunction("agoraUserLeft");
+      console.log("User left:", user.uid);
+      
       // Clean up video element when user leaves
       const videoNode = document.getElementById("video_" + user.uid);
       if (videoNode) {
@@ -126,9 +137,10 @@ export function useAgoraRTC({
         audioNode.remove();
       }
       
-      // Reset states when user leaves
+      // Reset states when user leaves and return to connect screen
       setHasReceivedVideo(false);
       updateConnectionState(ConnectionState.AVATAR_DISCONNECT);
+      updateConnectionState(ConnectionState.DISCONNECT);*/
     });
   
     // Cleanup function
@@ -183,9 +195,13 @@ export function useAgoraRTC({
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
           setLocalAudioTrack(audioTrack);
           
+          // Start muted during ringing/connection phase
+          audioTrack.setMuted(true);
+          setIsMuted(true);
+          
           // Publish the audio track
           await agoraClientRef.current.publish([audioTrack]);
-          setIsMuted(false)
+          console.log("Audio track created and published (muted during ringing)");
         } catch (error) {
           console.warn("Could not create/publish audio track:", error);
           setIsMuted(true)
@@ -218,6 +234,9 @@ export function useAgoraRTC({
     // Reset video state
     setHasReceivedVideo(false);
     
+    // Reset mute state for next connection
+    setIsMuted(true);
+    
     // Clean up all video and audio elements
     const mainVideoContainer = document.getElementById("mainvideo");
     if (mainVideoContainer) {
@@ -244,10 +263,20 @@ export function useAgoraRTC({
       const newMuteState = !isMuted;
       localAudioTrack.setMuted(newMuteState);
       setIsMuted(newMuteState);
+      console.log("Microphone", newMuteState ? "muted" : "unmuted");
     } else {
       showToast("Mic Access Needed", "Enable mic permission.", true);
     }
   }, [localAudioTrack, isMuted, showToast]);
+
+  // Auto-unmute when video connection is established (avatar connected)
+  useEffect(() => {
+    if (hasReceivedVideo && localAudioTrack && isMuted) {
+      console.log("Avatar video received, auto-unmuting microphone");
+      localAudioTrack.setMuted(false);
+      setIsMuted(false);
+    }
+  }, [hasReceivedVideo, localAudioTrack, isMuted]);
 
   return {
     localAudioTrack,

@@ -331,7 +331,8 @@ function App() {
           className={`left-section`}
           style={leftSectionStyle}
         >
-          {!isAppConnected && (
+          {/* Show connect screen when not connected OR when ringing but no avatar video yet */}
+          {(!isConnectInitiated || (isConnectInitiated && !connectionState.avatar.connected)) && (
             <ConnectScreen
               avatarId={videoAvatarConfig.avatarId}
               isPureChatMode={isPureChatMode}
@@ -381,9 +382,8 @@ function App() {
                 toast={toast.visible ? toast : null}
                 isPureChatMode={isPureChatMode}
               >
-                {/* Direct connect button rendering when not connected */}
-                {isAppConnected && (
-                  // Always show control buttons when connected, regardless of purechat mode
+                {/* Show control buttons only when avatar is actually connected (video received) */}
+                {connectionState.avatar.connected && (
                   <ControlButtons
                     isConnectInitiated={isConnectInitiated}
                     isMuted={agoraConnection.isMuted}

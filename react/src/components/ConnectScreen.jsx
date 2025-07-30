@@ -12,8 +12,7 @@ const ConnectScreen = ({
   const audioRef = useRef(null);
   const ringToneUrl = "/ring-tone.mp3";
 
-  const isConnected = checkIfFullyConnected(connectionState);
-  const isRinging = connectionState.app.connectInitiated && !isConnected;
+  const isRinging = connectionState.app.connectInitiated && !connectionState.avatar.connected; // Changed: ring until avatar video is received
 
   const playRingTone = () => {
     if (audioRef.current) {
@@ -29,9 +28,15 @@ const ConnectScreen = ({
     let ringInterval;
     const audioElement = audioRef.current;
 
-    // play ringing till the agora rtm connected, to avoid AEC issue.
-    if (isRinging && !connectionState.rtm.connected) {
+    // Continue ringing until we receive avatar video connection
+    if (isRinging && !connectionState.avatar.connected) {
       playRingTone();
+    } else {
+      // Stop audio when avatar is connected or not ringing
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
     }
 
     return () => {
@@ -44,7 +49,7 @@ const ConnectScreen = ({
         audioElement.currentTime = 0;
       }
     };
-  }, [isRinging, connectionState.rtm.connected]);
+  }, [isRinging, connectionState.avatar.connected]);
 
   // Get profile image URL with fallback
   const getProfileImageUrl = () => {
