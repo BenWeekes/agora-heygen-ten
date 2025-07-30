@@ -1,3 +1,4 @@
+// react/src/hooks/useAgoraConnection.jsx
 import { useState, useCallback, useRef } from 'react';
 import { ConnectionState } from "../utils/connectionState";
 import { useAgoraRTC } from './useAgoraRTC';
@@ -18,7 +19,8 @@ export function useAgoraConnection({
   agoraClientRef,
   videoAvatarRef,
   urlParams,
-  isFullyConnected // Add this parameter
+  isFullyConnected,
+  videoAvatarConfig // Add this parameter
 }) {
   const [agentId, setAgentId] = useState(null);
   const abortControllerRef = useRef(null);
@@ -110,6 +112,11 @@ export function useAgoraConnection({
       
       if (agoraConfig.profile) {
         searchParams.append("profile", agoraConfig.profile);
+      }
+      
+      // Add avatar ID if available
+      if (videoAvatarConfig && videoAvatarConfig.avatarId) {
+        searchParams.append("heygen_avatar_id", videoAvatarConfig.avatarId);
       }
 
       // Use the current endpoint from config if available, otherwise use the passed one
@@ -207,7 +214,7 @@ export function useAgoraConnection({
       }
       return { success: false };
     }
-  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController, agentEndpoint]);
+  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController, agentEndpoint, videoAvatarConfig]);
 
   const disconnectAgentEndpoint = useCallback(async () => {
     // Abort active api call

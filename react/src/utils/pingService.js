@@ -1,3 +1,4 @@
+// react/src/utils/pingService.js
 /**
  * Service for sending periodic ping messages to the agent endpoint
  */
@@ -16,7 +17,8 @@ export class PingService {
     this.intervalId = null;
     this.isActive = false;
     this.channelName = null;
-    this.pingEndpoint = process.env.REACT_APP_PING_ENDPOINT;
+    // Only set pingEndpoint if it's defined and not empty
+    this.pingEndpoint = process.env.REACT_APP_PING_ENDPOINT?.trim() || null;
     this.pingInterval = 30000; // 30 seconds default
   }
 
@@ -32,7 +34,7 @@ export class PingService {
     }
 
     if (!this.pingEndpoint) {
-      console.warn("Ping endpoint not configured, skipping ping service");
+      console.log("Ping service disabled - REACT_APP_PING_ENDPOINT not configured");
       return;
     }
 

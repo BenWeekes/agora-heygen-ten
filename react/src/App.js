@@ -1,3 +1,4 @@
+// react/src/App.js
 import React, {
   useCallback,
   useEffect,
@@ -106,7 +107,8 @@ function App() {
     agoraClientRef: agoraClient,
     urlParams,
     videoAvatarRef,
-    isFullyConnected: isAppConnected
+    isFullyConnected: isAppConnected,
+    videoAvatarConfig
   });
 
   
