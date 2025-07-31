@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import { processMessageCommands } from "../utils/videoAvatarUtils";
 import { callNativeAppFunction } from "../utils/nativeBridge";
-import { ConnectionState } from "../utils/connectionState";
 
 export default function useVideoAvatarManager({
   showToast,
@@ -79,7 +78,8 @@ export default function useVideoAvatarManager({
       eventHandler["avatar-status-update"]?.(data)
     }
   })
-}, [showToast, setLoadProgress, updateConnectionState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [showToast, setLoadProgress]);
 
 
   // Function to send message to video avatar (now just a placeholder since we're using Agora RTC directly)

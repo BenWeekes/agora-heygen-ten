@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { ConnectButton, DisconnectButton } from "./ConnectButton";
-import { checkIfFullyConnected } from "../utils/connectionState";
 
 const ConnectScreen = ({
   avatarId,

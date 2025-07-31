@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import AgoraRTC from "agora-rtc-sdk-ng";
 import { ConnectionState } from "../utils/connectionState";
 import { callNativeAppFunction } from '../utils/nativeBridge';
@@ -17,6 +17,7 @@ export function useAgoraRTC({
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted during ringing
   const [hasReceivedVideo, setHasReceivedVideo] = useState(false);
+  const [hasUserInteractedWithMute, setHasUserInteractedWithMute] = useState(false);
 
   const initializeAgoraClient = useCallback((
     agoraClientRef,
@@ -236,6 +237,7 @@ export function useAgoraRTC({
     
     // Reset mute state for next connection
     setIsMuted(true);
+    setHasUserInteractedWithMute(false);
     
     // Clean up all video and audio elements
     const mainVideoContainer = document.getElementById("mainvideo");
@@ -263,6 +265,7 @@ export function useAgoraRTC({
       const newMuteState = !isMuted;
       localAudioTrack.setMuted(newMuteState);
       setIsMuted(newMuteState);
+      setHasUserInteractedWithMute(true); // Mark that user has manually controlled mute
       console.log("Microphone", newMuteState ? "muted" : "unmuted");
     } else {
       showToast("Mic Access Needed", "Enable mic permission.", true);
@@ -270,13 +273,14 @@ export function useAgoraRTC({
   }, [localAudioTrack, isMuted, showToast]);
 
   // Auto-unmute when video connection is established (avatar connected)
+  // Only if user hasn't manually interacted with mute button
   useEffect(() => {
-    if (hasReceivedVideo && localAudioTrack && isMuted) {
+    if (hasReceivedVideo && localAudioTrack && isMuted && !hasUserInteractedWithMute) {
       console.log("Avatar video received, auto-unmuting microphone");
       localAudioTrack.setMuted(false);
       setIsMuted(false);
     }
-  }, [hasReceivedVideo, localAudioTrack, isMuted]);
+  }, [hasReceivedVideo, localAudioTrack, isMuted, hasUserInteractedWithMute]);
 
   return {
     localAudioTrack,
