@@ -1,7 +1,7 @@
 // react/src/utils/messageService.js
 
 import { decodeStreamMessage } from './utils';
-import Logger, { LogLevel } from './logger';
+import Logger from './logger'; // Fixed casing to match actual filename
 
 // Message Status Enum
 export const MessageStatus = {
@@ -223,12 +223,18 @@ export class MessageEngine {
     // Get values from message
     const turn_id = message.turn_id;
     const text = message.text || '';
-    const stream_id = message.stream_id || message.user_id;
+    
+    // FIX: Normalize uid handling - treat empty string as 0
+    let stream_id = message.stream_id || message.user_id || message.uid;
+    if (stream_id === '' || stream_id === null || stream_id === undefined) {
+      stream_id = 0; // Default to 0 for assistant messages with empty uid
+    }
+    
     const isFinal = message.final === true || message.turn_status === MessageStatus.END;
     const status = isFinal ? MessageStatus.END : MessageStatus.IN_PROGRESS;
     const message_id = message.message_id;
     
-    // Ensure valid timestamp
+    // Use the original timestamp from the message
     const validTime = this._getValidTimestamp(message.start_ms || message._time);
 
     // Look for an existing message by turn_id and stream_id
@@ -246,7 +252,7 @@ export class MessageEngine {
           ...existingMsg,
           text,
           status,
-          _time: validTime, // Use validated timestamp
+          // IMPORTANT: Don't update _time for existing messages
           metadata: message,
           message_id
         };
@@ -258,11 +264,12 @@ export class MessageEngine {
       this._appendChatHistory({
         turn_id,
         uid: stream_id,
-        _time: validTime, // Use validated timestamp
+        _time: validTime, // Use original timestamp
         text,
         status,
         metadata: message,
-        message_id
+        message_id,
+        originalTime: validTime // Store original time
       });
       
       this._mutateChatHistory();
@@ -279,6 +286,7 @@ export class MessageEngine {
 
     // Ensure valid timestamp
     item._time = this._getValidTimestamp(item._time);
+    item.originalTime = item.originalTime || item._time; // Store original time
     
     // If item.turn_id is 0, append to the front of messageList (greeting message)
     if (item.turn_id === 0) {
@@ -335,7 +343,15 @@ export class MessageEngine {
     const turn_id = message.turn_id;
     const text = message.text || '';
     const words = message.words || [];
-    const stream_id = message.stream_id;
+    
+    // FIX: Normalize uid handling - treat empty string as 0
+    let stream_id = message.stream_id || message.user_id || message.uid;
+    if (stream_id === '' || stream_id === null || stream_id === undefined) {
+      stream_id = 0;
+    }
+    
+    // Store the original timestamp
+    const originalTime = this._getValidTimestamp(message.start_ms || message._time);
     
     this._pushToQueue({
       turn_id,
@@ -343,7 +359,8 @@ export class MessageEngine {
       text,
       status,
       stream_id,
-      message_id: message.message_id
+      message_id: message.message_id,
+      originalTime // Pass original time to queue
     });
   }
 
@@ -526,7 +543,8 @@ export class MessageEngine {
         words: this.sortWordsWithStatus(data.words, data.status),
         status: data.status,
         stream_id: data.stream_id,
-        message_id: data.message_id
+        message_id: data.message_id,
+        originalTime: data.originalTime // Store original time
       };
       
       this._logger.debug(
@@ -624,10 +642,14 @@ export class MessageEngine {
     );
     
     if (!correspondingChatHistoryItem) {
+      // Use original timestamp from queue item, or fallback to current time
+      const messageTime = queueItem.originalTime || Date.now();
+      
       correspondingChatHistoryItem = {
         turn_id: queueItem.turn_id,
         uid: queueItem.stream_id,
-        _time: Date.now(),
+        _time: messageTime, // Use original timestamp
+        originalTime: messageTime, // Store original time
         text: queueItem.text || '', // Use the text from queueItem immediately
         status: queueItem.status,
         metadata: queueItem,
@@ -636,8 +658,7 @@ export class MessageEngine {
       
       this._appendChatHistory(correspondingChatHistoryItem);
     } else {
-      // Update existing message
-      correspondingChatHistoryItem._time = Date.now();
+      // Update existing message WITHOUT changing timestamp
       correspondingChatHistoryItem.metadata = queueItem;
       correspondingChatHistoryItem.text = queueItem.text || correspondingChatHistoryItem.text;
       
@@ -679,8 +700,12 @@ export class MessageEngine {
       `Updated message list (${this.messageList.length} messages)`
     );
     
-    // Sort messages by time for consistent display
-    this.messageList.sort((a, b) => a._time - b._time);
+    // Sort messages by originalTime (or _time if originalTime not available)
+    this.messageList.sort((a, b) => {
+      const timeA = a.originalTime || a._time;
+      const timeB = b.originalTime || b._time;
+      return timeA - timeB;
+    });
     
     // Always make a new copy of the array to ensure React detects the change
     if (this.onMessageListUpdate) {

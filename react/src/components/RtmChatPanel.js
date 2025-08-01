@@ -476,14 +476,17 @@ export const RtmChatPanel = ({
         const msgTime = msg._time || msg.start_ms;
         const validTime = msgTime && new Date(msgTime).getFullYear() > 1971 ? msgTime : Date.now();
 
+        // FIX: Normalize uid - treat empty string as 0
+        const msgUid = (msg.uid === '' || msg.uid === null || msg.uid === undefined) ? 0 : msg.uid;
+
         return {
-          id: `preserved-subtitle-${msg.uid}-${msg.turn_id}-${msg.message_id || validTime}`,
-          type: msg.uid === 0 ? "agent" : "user",
+          id: `preserved-subtitle-${msgUid}-${msg.turn_id}-${msg.message_id || validTime}`,
+          type: msgUid === 0 || msgUid === '0' ? "agent" : "user",
           time: validTime,
           content: messageText,
           contentType: "text",
-          userId: String(msg.uid),
-          isOwn: msg.uid !== 0,
+          userId: String(msgUid),
+          isOwn: msgUid !== 0 && msgUid !== '0',
           isSubtitle: true,
           status: MessageStatus.END,
           turn_id: msg.turn_id,
@@ -510,14 +513,17 @@ export const RtmChatPanel = ({
       const validTime =
         msgTime && new Date(msgTime).getFullYear() > 1971 ? msgTime : now;
 
+      // FIX: Normalize uid - treat empty string as 0
+      const msgUid = (msg.uid === '' || msg.uid === null || msg.uid === undefined) ? 0 : msg.uid;
+
       subtitleMessages.push({
-        id: `preserved-subtitle-${msg.uid}-${msg.turn_id}-${msg.message_id || now}`,
-        type: msg.uid === 0 ? "agent" : "user",
+        id: `preserved-subtitle-${msgUid}-${msg.turn_id}-${msg.message_id || now}`,
+        type: msgUid === 0 || msgUid === '0' ? "agent" : "user",
         time: validTime,
         content: messageText,
         contentType: "text",
-        userId: String(msg.uid),
-        isOwn: msg.uid !== 0,
+        userId: String(msgUid),
+        isOwn: msgUid !== 0 && msgUid !== '0',
         isSubtitle: true,
         status: MessageStatus.END,
         turn_id: msg.turn_id,
@@ -545,14 +551,17 @@ export const RtmChatPanel = ({
       const validTime =
         msgTime && new Date(msgTime).getFullYear() > 1971 ? msgTime : now;
 
+      // FIX: Normalize uid - treat empty string as 0
+      const msgUid = (msg.uid === '' || msg.uid === null || msg.uid === undefined) ? 0 : msg.uid;
+
       subtitleMessages.push({
-        id: `subtitle-${msg.uid}-${msg.turn_id}-${msg.message_id || now}`,
-        type: msg.uid === 0 ? "agent" : "user",
+        id: `subtitle-${msgUid}-${msg.turn_id}-${msg.message_id || now}`,
+        type: msgUid === 0 || msgUid === '0' ? "agent" : "user",
         time: validTime,
         content: messageText,
         contentType: "text",
-        userId: String(msg.uid),
-        isOwn: msg.uid !== 0,
+        userId: String(msgUid),
+        isOwn: msgUid !== 0 && msgUid !== '0',
         isSubtitle: true,
         status: msg.status,
         turn_id: msg.turn_id,
