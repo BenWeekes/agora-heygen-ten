@@ -53,7 +53,8 @@ export const RtmChatPanel = ({
   isFullscreen,
   registerDirectSend,
   urlParams,
-  getMessageChannelName
+  getMessageChannelName,
+  agentRtmUid // Add this parameter
 }) => {
   const [rtmInputText, setRtmInputText] = useState("");
   const [liveSubtitles, setLiveSubtitles] = useState([]);
@@ -108,7 +109,9 @@ export const RtmChatPanel = ({
 
     try {
       const targetChannel = channel || (getMessageChannelName ? getMessageChannelName() : '') || '';
-      const publishTarget = targetChannel ? `agent-${targetChannel}` : 'agent';
+      
+      // Use agentRtmUid if available, otherwise fall back to the old format
+      const publishTarget = agentRtmUid || (targetChannel ? `agent-${targetChannel}` : 'agent');
       
       logger.log("Direct send using rtmClient:", !!rtmClient, "Skip history:", skipHistory, "Target:", publishTarget);
       
@@ -149,7 +152,7 @@ export const RtmChatPanel = ({
       logger.error("Failed to send message via direct send:", error);
       return false;
     }
-  }, [rtmClient, agoraConfig.uid, getMessageChannelName, isPureChatMode, isConnectInitiated]);  
+  }, [rtmClient, agoraConfig.uid, getMessageChannelName, isPureChatMode, isConnectInitiated, agentRtmUid]);  
 
   // Register the direct send function when available
   useEffect(() => {

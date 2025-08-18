@@ -11,7 +11,8 @@ export function useAgoraRTM({
   updateConnectionState,
   urlParams,
   processAndSendMessageToAvatar,
-  isFullyConnected // Add this parameter to track full connection state
+  isFullyConnected, // Add this parameter to track full connection state
+  agentRtmUid // Add this parameter for agent RTM UID
 }) {
   const [rtmClient, setRtmClient] = useState(null);
   const [rtmMessages, setRtmMessages] = useState([]);
@@ -271,6 +272,8 @@ export function useAgoraRTM({
     setRtmMessages,
     handleContinueParamOnAvatarStatus,
     // Expose the message channel name function for use in components
-    getMessageChannelName
+    getMessageChannelName,
+    // Expose the agent RTM UID for use in components
+    agentRtmUid
   };
 }

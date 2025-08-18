@@ -32,6 +32,7 @@ export const getParamsFromUrl = () => {
     const endpointParam = urlParams.get("endpoint");
     const purechatParam = urlParams.get("purechat");
     const skinParam = urlParams.get("skin");
+    const agentConnectParam = urlParams.get("agentConnect");
     
     // Add new content parameters
     const contentTypeParam = urlParams.get("contentType");
@@ -79,6 +80,10 @@ export const getParamsFromUrl = () => {
     if (purechatParam) {
       console.log(`Pure chat mode enabled: ${purechatParam}`);
     }
+
+    if (agentConnectParam !== null) {
+      console.log(`Agent connect mode: ${agentConnectParam}`);
+    }
     
     if (skinParam) {
       console.log(`Using skin from URL: ${skinParam}`);
@@ -106,6 +111,7 @@ export const getParamsFromUrl = () => {
       continue: continueParam || null,
       continueDelay: continueDelay, // New parameter for continue delay in ms
       purechat: purechatParam === "true",
+      agentConnect: agentConnectParam === null ? true : agentConnectParam === "true", // Default to true if not specified
       skin: skinParam || "whatsapp", // Default to whatsapp skin
       // Add new content parameters to the returned object
       contentType: contentTypeParam || null,
@@ -125,6 +131,7 @@ export const getParamsFromUrl = () => {
     continue: null,
     continueDelay: null, // New parameter for continue delay in ms
     purechat: false,
+    agentConnect: true, // Default to true
     skin: "whatsapp", // Default to whatsapp skin
     contentType: null,
     contentURL: null,

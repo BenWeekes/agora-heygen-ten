@@ -411,6 +411,7 @@ function App() {
           registerDirectSend={agoraConnection.registerDirectRtmSend}
           urlParams={urlParams}
           getMessageChannelName={agoraConnection.getMessageChannelName}
+          agentRtmUid={agoraConnection.agentRtmUid} // Add this line
         />
 
       </div>

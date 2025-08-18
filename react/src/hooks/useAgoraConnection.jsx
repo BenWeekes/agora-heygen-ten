@@ -23,6 +23,7 @@ export function useAgoraConnection({
   videoAvatarConfig // Add this parameter
 }) {
   const [agentId, setAgentId] = useState(null);
+  const [agentRtmUid, setAgentRtmUid] = useState(null); // Store agent_rtm_uid
   const abortControllerRef = useRef(null);
   const isEndpointConnectedRef = useRef(false);
   
@@ -36,14 +37,15 @@ export function useAgoraConnection({
     videoAvatarRef
   });
   
-  // Initialize Agora RTM hook
+  // Initialize Agora RTM hook with agent RTM UID
   const agoraRTM = useAgoraRTM({
     agoraConfig,
     derivedChannelName,
     updateConnectionState,
     urlParams,
     processAndSendMessageToAvatar,
-    isFullyConnected
+    isFullyConnected,
+    agentRtmUid // Pass agent RTM UID to RTM hook
   });
 
    // Create and set abort controller for connection cancellation
@@ -92,9 +94,13 @@ export function useAgoraConnection({
         channel: derivedChannelName,
       });
       
-      // Add connect=false for purechat mode
-      if (!shouldConnectAgent) {
+      // Check if agentConnect is false from URL params
+      const shouldConnect = urlParams.agentConnect !== false && shouldConnectAgent;
+      
+      // Add connect=false if either condition requires it
+      if (!shouldConnect) {
         searchParams.append("connect", "false");
+        console.log("Setting connect=false in agent endpoint call (agentConnect:", urlParams.agentConnect, ", shouldConnectAgent:", shouldConnectAgent, ")");
       }
       
       // Add optional parameters if they exist
@@ -142,6 +148,12 @@ export function useAgoraConnection({
       const data = await response.json();
       console.log("Agent response:", data);
       
+      // Extract and save agent_rtm_uid from response
+      if (data.agent_rtm_uid) {
+        setAgentRtmUid(data.agent_rtm_uid);
+        console.log("Agent RTM UID:", data.agent_rtm_uid);
+      }
+      
       // Extract and save agent_id from response regardless of status code
       try {
         if (data.agent_response && data.agent_response.response) {
@@ -164,12 +176,12 @@ export function useAgoraConnection({
           result.uid = data.user_token.uid || result.uid;
         }
         
-        if (shouldConnectAgent && !silentMode) {
+        if (shouldConnect && !silentMode) {
           showToast("Connected");
           updateConnectionState(ConnectionState.AGENT_CONNECTED);
           // Start ping service when agent is connected
           pingService.start(derivedChannelName);
-        } else if (shouldConnectAgent) {
+        } else if (shouldConnect) {
           // Silent mode but still need to update state
           updateConnectionState(ConnectionState.AGENT_CONNECTED);
           // Start ping service when agent is connected (silent mode)
@@ -214,7 +226,7 @@ export function useAgoraConnection({
       }
       return { success: false };
     }
-  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController, agentEndpoint, videoAvatarConfig]);
+  }, [agoraConfig, derivedChannelName, updateConnectionState, showToast, createAbortController, agentEndpoint, videoAvatarConfig, urlParams.agentConnect]);
 
   const disconnectAgentEndpoint = useCallback(async () => {
     // Abort active api call
@@ -223,8 +235,9 @@ export function useAgoraConnection({
     // Stop ping service when disconnecting
     pingService.stop();
 
-    // Reset agent ID
+    // Reset agent ID and RTM UID
     setAgentId(null);
+    setAgentRtmUid(null);
     
     // Send hangup request to agent endpoint if needed
     if (agentEndpoint && agentId && isEndpointConnectedRef.current) {
@@ -416,6 +429,7 @@ export function useAgoraConnection({
     ...agoraRTC,
     ...agoraRTM,
     agentId,
+    agentRtmUid, // Expose agent RTM UID
     connectToAgora,
     connectToPureChat,
     disconnectFromAgora

@@ -59,6 +59,7 @@ export function useAgoraRTC({
         // Play audio track
         user.audioTrack.play(audioNode);
       } else if (mediaType === "video") {
+        console.error('Video track received - this indicates avatar is ready, stopping ring tone');
         console.log("Video track received - this indicates avatar is ready, stopping ring tone");
         
         // Mark that we've received video (avatar is ready)
@@ -85,6 +86,8 @@ export function useAgoraRTC({
           }
         }
         user.videoTrack.play(videoNode);
+           console.error('PLAYING VIDEO',videoNode,user.videoTrack);
+     
       }
     });
   
@@ -201,7 +204,7 @@ export function useAgoraRTC({
           setIsMuted(true);
           
           // Publish the audio track
-          await agoraClientRef.current.publish([audioTrack]);
+          //await agoraClientRef.current.publish([audioTrack]);
           console.log("Audio track created and published (muted during ringing)");
         } catch (error) {
           console.warn("Could not create/publish audio track:", error);
