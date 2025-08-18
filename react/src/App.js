@@ -375,6 +375,7 @@ function App() {
                 isAppConnected={isAppConnected}
                 isConnectInitiated={isConnectInitiated}
                 isAvatarLoaded={connectionState.avatar.loaded}
+                isAvatarConnected={connectionState.avatar.connected} // Pass avatar connection state
                 loadProgress={loadProgress}
                 videoAvatarConfig={videoAvatarConfig}
                 videoAvatarRef={videoAvatarRef}

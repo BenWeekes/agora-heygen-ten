@@ -17,6 +17,7 @@ export const VideoAvatarView = ({
   toggleFullscreen,
   toast, // Add toast prop here
   isPureChatMode = false,
+  isAvatarConnected = false, // Add this prop to track avatar connection independently
 }) => {
   return (
     <div className={`avatar-container ${isFullscreen ? "fullscreen" : ""}`}>
@@ -54,9 +55,9 @@ export const VideoAvatarView = ({
       )}
 
 
-      {/* Video Avatar container - show when connected (video will appear from Agora RTC) */}
+      {/* Video Avatar container - show when avatar is connected (even without agent) */}
       <div 
-        className={`video-avatar ${!isAppConnected ? "hidden" : ""}`}
+        className={`video-avatar ${!isAvatarConnected ? "hidden" : ""}`}
         id="mainvideo"
         style={{
           width: "100%",
