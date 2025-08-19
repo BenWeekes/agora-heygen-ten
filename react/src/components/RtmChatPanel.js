@@ -211,6 +211,21 @@ export const RtmChatPanel = ({
               // Mark as processed
               setProcessedMessageIds(prev => new Set([...prev, messageKey]));
               
+              // For user transcriptions that echo back, check if we already have this in pending messages
+              if (isUserTranscription) {
+                // Check if this is an echo of a message we already sent
+                const isDuplicate = pendingRtmMessages.some(msg => 
+                  msg.type === 'user' && 
+                  msg.content === parsedMsg.text &&
+                  msg.isOwn === true
+                );
+                
+                if (isDuplicate) {
+                  logger.log("Skipping echo of user message we already have:", parsedMsg.text);
+                  return;
+                }
+              }
+              
               // Create message with correct type based on transcription object
               messageToProcess = {
                 type: isUserTranscription ? 'user' : 'agent',
@@ -400,7 +415,7 @@ export const RtmChatPanel = ({
         logger.error("Error processing RTM message:", error);
       }
     },
-    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated, processedMessageIds]
+    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated, processedMessageIds, pendingRtmMessages]
   );
 
   // Initialize MessageEngine for subtitles with message processor
@@ -514,7 +529,11 @@ export const RtmChatPanel = ({
   // Combine live subtitles and RTM messages into a single timeline
   useEffect(() => {
     if (isPureChatMode && !isConnectInitiated) {
-      const typedMessages = pendingRtmMessages
+      // Create a map to deduplicate messages by turn_id/message_id
+      const messageMap = new Map();
+      
+      // Process typed messages
+      pendingRtmMessages
         .filter(msg => {
           // Filter out typing indicator messages
           try {
@@ -524,19 +543,30 @@ export const RtmChatPanel = ({
             return true; // Keep non-JSON messages
           }
         })
-        .map((msg, index) => {
+        .forEach((msg, index) => {
           const validTime =
             msg.time && new Date(msg.time).getFullYear() > 1971 ? msg.time : Date.now();
-          return {
-            id: `typed-${msg.userId}-${validTime}-${index}`,
-            ...msg,
-            time: validTime,
-            isSubtitle: false,
-            fromPreviousSession: false,
-          };
+          
+          // Create unique key for deduplication
+          const key = msg.message_id || msg.turn_id 
+            ? `${msg.type}-${msg.turn_id || 'no-turn'}-${msg.message_id || index}`
+            : `typed-${msg.userId}-${validTime}-${index}`;
+          
+          // For messages with the same turn_id, keep the most recent/complete one
+          const existing = messageMap.get(key);
+          if (!existing || msg.content.length >= existing.content.length) {
+            messageMap.set(key, {
+              id: key,
+              ...msg,
+              time: validTime,
+              isSubtitle: false,
+              fromPreviousSession: false,
+            });
+          }
         });
 
-      const preservedSubtitleMessagesForDisplay = preservedSubtitleMessages.map((msg) => {
+      // Process preserved subtitle messages
+      preservedSubtitleMessages.forEach((msg) => {
         const messageText = msg.text || (msg.metadata && msg.metadata.text) || "";
         const msgTime = msg._time || msg.start_ms;
         const validTime = msgTime && new Date(msgTime).getFullYear() > 1971 ? msgTime : Date.now();
@@ -544,8 +574,10 @@ export const RtmChatPanel = ({
         // FIX: Normalize uid - treat empty string as 0
         const msgUid = (msg.uid === '' || msg.uid === null || msg.uid === undefined) ? 0 : msg.uid;
 
-        return {
-          id: `preserved-subtitle-${msgUid}-${msg.turn_id}-${msg.message_id || validTime}`,
+        const key = `preserved-subtitle-${msgUid}-${msg.turn_id}-${msg.message_id || validTime}`;
+        
+        messageMap.set(key, {
+          id: key,
           type: msgUid === 0 || msgUid === '0' ? "agent" : "user",
           time: validTime,
           content: messageText,
@@ -557,10 +589,10 @@ export const RtmChatPanel = ({
           turn_id: msg.turn_id,
           message_id: msg.message_id,
           fromPreviousSession: true,
-        };
+        });
       });
 
-      const allMessages = [...typedMessages, ...preservedSubtitleMessagesForDisplay];
+      const allMessages = Array.from(messageMap.values());
       setCombinedMessages(allMessages.sort((a, b) => a.time - b.time));
       return;
     }
@@ -665,10 +697,36 @@ export const RtmChatPanel = ({
       allMessageMap.set(key, msg);
     });
 
-    // Add typed messages, avoiding duplicates based on content and type
+    // Add typed messages, checking for duplicates
     typedMessages.forEach((msg) => {
+      // For messages with turn_id, check if we already have a message with the same turn_id
+      if (msg.turn_id) {
+        // Find existing message with same turn_id and type
+        let existingKey = null;
+        for (const [key, existingMsg] of allMessageMap) {
+          if (existingMsg.turn_id === msg.turn_id && existingMsg.type === msg.type) {
+            existingKey = key;
+            break;
+          }
+        }
+        
+        if (existingKey) {
+          // Update the existing message if the new one is more complete
+          const existing = allMessageMap.get(existingKey);
+          if (msg.content.length >= existing.content.length) {
+            allMessageMap.set(existingKey, {
+              ...existing,
+              ...msg,
+              id: existing.id // Keep the original ID
+            });
+          }
+          return; // Don't add as a separate message
+        }
+      }
+      
+      // No duplicate found, add as new message
       const key = `typed-${msg.type}-${msg.userId}-${msg.time}`;
-
+      
       // Check for duplicate based on content, type, and similar timing
       const hasSimilarMessage = Array.from(allMessageMap.values()).some(
         (existing) =>
