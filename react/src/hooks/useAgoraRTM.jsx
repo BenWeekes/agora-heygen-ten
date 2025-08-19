@@ -137,9 +137,13 @@ export function useAgoraRTM({
       const loginChannelName = getLoginChannelName();
       console.log(`Connecting to RTM with login channel: ${loginChannelName}`);
       
+      // Use name from agoraConfig if available, otherwise use uid
+      const rtmUid = agoraConfig.name || uid;
+      console.log(`Using RTM UID: ${rtmUid} (name: ${agoraConfig.name}, uid: ${uid})`);
+      
       const rtmClientInstance = await initRtmClient(
         agoraConfig.appId,
-        uid,
+        rtmUid, // Pass the name/uid here
         token,
         loginChannelName, // This is always derivedChannelName
         handleRtmMessageCallback
@@ -161,7 +165,7 @@ export function useAgoraRTM({
       }
       return null;
     }
-  }, [agoraConfig.appId, getLoginChannelName, handleRtmMessageCallback, updateConnectionState]);
+  }, [agoraConfig.appId, agoraConfig.name, getLoginChannelName, handleRtmMessageCallback, updateConnectionState]);
 
   // Disconnect from Agora RTM
   const disconnectFromRtm = useCallback(async () => {

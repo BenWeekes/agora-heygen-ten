@@ -11,7 +11,8 @@ export const useAppConfig = () => {
     appId: process.env.REACT_APP_AGORA_APP_ID,
     channelName: urlParams.channelName ?? process.env.REACT_APP_AGORA_CHANNEL_NAME,
     token: process.env.REACT_APP_AGORA_TOKEN || null,
-    uid: process.env.REACT_APP_AGORA_UID || null,
+    uid: urlParams.name || process.env.REACT_APP_AGORA_UID || null, // Use name if provided
+    name: urlParams.name || null, // Store name separately too
     voice_id: urlParams.voice_id || null,
     prompt: urlParams.prompt || null,
     greeting: urlParams.greeting || null,
@@ -40,6 +41,7 @@ export const useAppConfig = () => {
     }
     console.log("URL Parameters:", urlParams);
     console.log("Continue param:", urlParams.continue);
+    console.log("Name param:", urlParams.name);
     console.log("Content params:", {
       type: urlParams.contentType,
       url: urlParams.contentURL,
@@ -49,12 +51,13 @@ export const useAppConfig = () => {
 
   useEffect(() => {
     const handleAgoraDetailsUpdated = (data) => {
-      const { appId, channelName, uid, voice_id, prompt, greeting, profile,endpoint } = data;
+      const { appId, channelName, uid, voice_id, prompt, greeting, profile, endpoint, name } = data;
       setAgoraConfig(_agoraConfig => ({
         ..._agoraConfig,
         appId,
         channelName,
-        uid,
+        uid: name || uid, // Prefer name if provided
+        name: name || _agoraConfig.name, // Update name if provided
         voice_id,
         prompt,
         greeting,

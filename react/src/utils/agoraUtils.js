@@ -33,6 +33,7 @@ export const getParamsFromUrl = () => {
     const purechatParam = urlParams.get("purechat");
     const skinParam = urlParams.get("skin");
     const agentConnectParam = urlParams.get("agentConnect");
+    const nameParam = urlParams.get("name"); // Add name parameter
     
     // Add new content parameters
     const contentTypeParam = urlParams.get("contentType");
@@ -88,6 +89,10 @@ export const getParamsFromUrl = () => {
     if (skinParam) {
       console.log(`Using skin from URL: ${skinParam}`);
     }
+
+    if (nameParam) {
+      console.log(`Using name from URL: ${nameParam}`);
+    }
     
     // Log new content parameters
     if (contentTypeParam) {
@@ -113,6 +118,7 @@ export const getParamsFromUrl = () => {
       purechat: purechatParam === "true",
       agentConnect: agentConnectParam === null ? true : agentConnectParam === "true", // Default to true if not specified
       skin: skinParam || "whatsapp", // Default to whatsapp skin
+      name: nameParam || null, // Add name parameter
       // Add new content parameters to the returned object
       contentType: contentTypeParam || null,
       contentURL: contentUrlParam || null,
@@ -133,9 +139,11 @@ export const getParamsFromUrl = () => {
     purechat: false,
     agentConnect: true, // Default to true
     skin: "whatsapp", // Default to whatsapp skin
+    name: null, // Add name parameter default
     contentType: null,
     contentURL: null,
     contentALT: null,
+    contentLayout: "default",
     endpoint: null
   };
 };

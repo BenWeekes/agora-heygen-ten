@@ -4,7 +4,7 @@ import AgoraRTM from "agora-rtm";
  * Initialize and set up an RTM client
  * 
  * @param {string} appId - Agora App ID
- * @param {number|string} uid - User ID
+ * @param {number|string} uid - User ID or name
  * @param {string} token - Authentication token
  * @param {string} loginChannelName - Channel to use for login (always derivedChannelName)
  * @param {Function} messageHandler - Callback for RTM messages
@@ -12,14 +12,22 @@ import AgoraRTM from "agora-rtm";
  */
 export const initRtmClient = async (appId, uid, token, loginChannelName, messageHandler) => {
   try {
-    // Create RTM client - always use derivedChannelName for login
+    // Check if uid is a name (non-numeric string)
+    const isName = isNaN(uid) || (typeof uid === 'string' && uid.trim() !== '' && isNaN(Number(uid)));
+    
+    // If uid looks like a name, use it directly
+    // Otherwise, use the composite format
+    const rtmLoginId = isName ? uid : String(uid + "-" + loginChannelName);
+    
+    // Create RTM client
     console.log("RTM Login:", {
       uid: uid,
+      isName: isName,
       loginChannelName: loginChannelName,
-      loginString: String(uid + "-" + loginChannelName)
+      rtmLoginId: rtmLoginId
     });
     
-    const rtm = new AgoraRTM.RTM(appId, String(uid + "-" + loginChannelName), {
+    const rtm = new AgoraRTM.RTM(appId, rtmLoginId, {
       logLevel: "warn",
     });
     

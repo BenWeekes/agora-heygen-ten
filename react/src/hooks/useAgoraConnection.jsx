@@ -76,7 +76,7 @@ export function useAgoraConnection({
       // Default values from config
       let result = {
         token: agoraConfig.token,
-        uid: agoraConfig.uid,
+        uid: agoraConfig.name || agoraConfig.uid, // Prefer name if available
         success: true
       };
       
@@ -101,6 +101,12 @@ export function useAgoraConnection({
       if (!shouldConnect) {
         searchParams.append("connect", "false");
         console.log("Setting connect=false in agent endpoint call (agentConnect:", urlParams.agentConnect, ", shouldConnectAgent:", shouldConnectAgent, ")");
+      }
+      
+      // Add name parameter if it exists
+      if (agoraConfig.name) {
+        searchParams.append("name", agoraConfig.name);
+        console.log("Sending name to agent endpoint:", agoraConfig.name);
       }
       
       // Add optional parameters if they exist
@@ -173,7 +179,8 @@ export function useAgoraConnection({
         // Set token and uid from response if available
         if (data.user_token) {
           result.token = data.user_token.token || result.token;
-          result.uid = data.user_token.uid || result.uid;
+          // Prefer name over uid from response
+          result.uid = agoraConfig.name || data.user_token.uid || result.uid;
         }
         
         if (shouldConnect && !silentMode) {
@@ -210,7 +217,8 @@ export function useAgoraConnection({
       // Set user token and uid if provided
       if (data.user_token) {
         result.token = data.user_token.token || result.token;
-        result.uid = data.user_token.uid || result.uid;
+        // Prefer name over uid from response
+        result.uid = agoraConfig.name || data.user_token.uid || result.uid;
       }
       
       return result;
