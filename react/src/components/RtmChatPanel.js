@@ -64,7 +64,7 @@ export const RtmChatPanel = ({
   const [pendingRtmMessages, setPendingRtmMessages] = useState([]);
   const [preservedSubtitleMessages, setPreservedSubtitleMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState(new Set());
-  const [processedMessageIds, setProcessedMessageIds] = useState(new Set()); // Track processed message IDs
+  const [rtmReceivedMessages, setRtmReceivedMessages] = useState(new Set()); // Track messages received via RTM listener
   const rtmMessageEndRef = useRef(null);
   const messageEngineRef = useRef(null);
 
@@ -147,6 +147,7 @@ export const RtmChatPanel = ({
             contentType: "text",
             userId: String(agoraConfig.uid),
             isOwn: true,
+            fromRtmListener: false
           }]);
         } else {
           logger.log("Not adding to local history - message will echo back from agent or skipHistory=true");
@@ -173,74 +174,106 @@ export const RtmChatPanel = ({
 
   const handleRtmMessageCallback = useCallback(
     (event) => {
-      logger.warn('handleRtmMessageCallback', event);
+      logger.log('[RTM] Raw message event received:', {
+        channelName: event.channelName,
+        publisher: event.publisher,
+        messageType: event.messageType,
+        timestamp: event.timestamp,
+        messagePreview: event.message?.substring(0, 100)
+      });
       
       try {
         const { message, messageType, timestamp, publisher } = event;
         
-        logger.log("[RTM] Message received:", {
-          publisher,
-          currentUserId: agoraConfig.uid,
-          messageType,
-          timestamp,
-          message: typeof message === 'string' ? message.substring(0, 100) : '[binary data]'
-        });
+        // Create a unique key for this message
+        const messageKey = `${publisher}-${timestamp}-${message?.substring(0, 50)}`;
         
-        // Default to checking if it's from agent based on publisher
+        // Check if we've already processed this exact message
+        if (rtmReceivedMessages.has(messageKey)) {
+          logger.log('[RTM] Skipping already processed message:', messageKey);
+          return;
+        }
+        
+        // Mark this message as received
+        setRtmReceivedMessages(prev => new Set([...prev, messageKey]));
+        
+        // Parse message first to determine actual sender
+        let parsedMsg = null;
+        let actualMessageType = null;
+        
+        if (messageType === "STRING") {
+          try {
+            parsedMsg = JSON.parse(message);
+            
+            // CRITICAL: Determine actual message type from transcription object
+            if (parsedMsg.object === "user.transcription") {
+              actualMessageType = 'user';
+              logger.log('[RTM] Detected USER transcription despite publisher:', publisher);
+            } else if (parsedMsg.object === "assistant.transcription") {
+              actualMessageType = 'agent';
+              logger.log('[RTM] Detected AGENT transcription from publisher:', publisher);
+            }
+          } catch (e) {
+            // Not JSON, will process as plain text later
+          }
+        }
+        
+        // Only use publisher-based detection if we couldn't determine from content
         const isFromAgentByPublisher = publisher !== String(agoraConfig.uid);
+        const effectiveType = actualMessageType || (isFromAgentByPublisher ? 'agent' : 'user');
+        
+        logger.log('[RTM] Message type determination:', {
+          publisher,
+          currentUserId: String(agoraConfig.uid),
+          isFromAgentByPublisher,
+          actualMessageType,
+          effectiveType,
+          transcriptionObject: parsedMsg?.object
+        });
         
         if (messageType === "STRING") {
           let messageToProcess = null;
           
-          try {
-            const parsedMsg = JSON.parse(message);
-            
-            // Check for transcription messages with explicit object type
+          if (parsedMsg) {
+            // Handle transcription messages
             if (parsedMsg.object === "user.transcription" || parsedMsg.object === "assistant.transcription") {
-              // Use the object field to determine message type
               const isUserTranscription = parsedMsg.object === "user.transcription";
-              const isAssistantTranscription = parsedMsg.object === "assistant.transcription";
               
-              // Skip if we've already processed this message
-              const messageKey = `${parsedMsg.object}-${parsedMsg.turn_id}-${parsedMsg.message_id || timestamp}`;
-              if (parsedMsg.message_id && processedMessageIds.has(messageKey)) {
-                logger.log("Skipping duplicate message:", messageKey);
+              // Check for duplicates based on content and timing
+              const isDuplicate = pendingRtmMessages.some(msg => 
+                msg.content === parsedMsg.text &&
+                msg.type === (isUserTranscription ? 'user' : 'agent') &&
+                Math.abs(msg.time - timestamp) < 2000 // Within 2 seconds
+              );
+              
+              if (isDuplicate) {
+                logger.log('[RTM] Skipping duplicate transcription:', parsedMsg.text);
                 return;
               }
               
-              // Mark as processed
-              setProcessedMessageIds(prev => new Set([...prev, messageKey]));
-              
-              // For user transcriptions that echo back, check if we already have this in pending messages
-              if (isUserTranscription) {
-                // Check if this is an echo of a message we already sent
-                const isDuplicate = pendingRtmMessages.some(msg => 
-                  msg.type === 'user' && 
-                  msg.content === parsedMsg.text &&
-                  msg.isOwn === true
-                );
-                
-                if (isDuplicate) {
-                  logger.log("Skipping echo of user message we already have:", parsedMsg.text);
-                  return;
-                }
-              }
-              
-              // Create message with correct type based on transcription object
+              // Create message with DEFINITIVE type from transcription object
               messageToProcess = {
                 type: isUserTranscription ? 'user' : 'agent',
                 time: timestamp || Date.now(),
                 content: parsedMsg.text || '',
                 contentType: 'text',
                 userId: isUserTranscription ? String(agoraConfig.uid) : publisher,
-                isOwn: isUserTranscription,
+                isOwn: isUserTranscription, // ALWAYS true for user transcriptions
                 turn_id: parsedMsg.turn_id,
-                message_id: parsedMsg.message_id
+                message_id: parsedMsg.message_id,
+                fromRtmListener: true // Mark that this came from RTM listener
               };
+              
+              logger.log('[RTM] Created transcription message:', {
+                type: messageToProcess.type,
+                isOwn: messageToProcess.isOwn,
+                content: messageToProcess.content.substring(0, 50)
+              });
             }
             // Handle typing indicators
             else if (parsedMsg.type === "typing_start") {
-              if (isFromAgentByPublisher) {
+              if (effectiveType === 'agent') {
+                logger.log('[RTM] Agent typing indicator received');
                 setTypingUsers(prev => new Set([...prev, publisher]));
                 setTimeout(() => {
                   setTypingUsers(prev => {
@@ -255,52 +288,62 @@ export const RtmChatPanel = ({
             // Handle image messages
             else if (parsedMsg.img) {
               messageToProcess = {
-                type: isFromAgentByPublisher ? 'agent' : 'user',
+                type: effectiveType,
                 time: timestamp || Date.now(),
                 content: parsedMsg.img,
                 contentType: 'image',
                 userId: publisher,
-                isOwn: !isFromAgentByPublisher
+                isOwn: effectiveType === 'user',
+                fromRtmListener: true
               };
             }
             // Handle text messages from JSON (without explicit transcription type)
             else if (parsedMsg.text !== undefined) {
               messageToProcess = {
-                type: isFromAgentByPublisher ? 'agent' : 'user',
+                type: effectiveType,
                 time: timestamp || Date.now(),
                 content: parsedMsg.text,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgentByPublisher,
-                turn_id: parsedMsg.turn_id
+                isOwn: effectiveType === 'user',
+                turn_id: parsedMsg.turn_id,
+                fromRtmListener: true
               };
             }
             // Handle other JSON messages
             else {
               messageToProcess = {
-                type: isFromAgentByPublisher ? 'agent' : 'user',
+                type: effectiveType,
                 time: timestamp || Date.now(),
                 content: message,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgentByPublisher
+                isOwn: effectiveType === 'user',
+                fromRtmListener: true
               };
             }
             
-          } catch (parseError) {
+          } else {
             // Not valid JSON, treat as plain text
             messageToProcess = {
-              type: isFromAgentByPublisher ? 'agent' : 'user',
+              type: effectiveType,
               time: timestamp || Date.now(),
               content: message,
               contentType: 'text',
               userId: publisher,
-              isOwn: !isFromAgentByPublisher
+              isOwn: effectiveType === 'user',
+              fromRtmListener: true
             };
           }
           
           // Process the message through shared logic
           if (messageToProcess) {
+            logger.log('[RTM] Processing message for display:', {
+              type: messageToProcess.type,
+              isOwn: messageToProcess.isOwn,
+              contentPreview: messageToProcess.content.substring(0, 30)
+            });
+            
             // Clear typing indicator for any real message from agent
             if (messageToProcess.type === 'agent') {
               setTypingUsers(prev => {
@@ -319,7 +362,13 @@ export const RtmChatPanel = ({
             );
             
             if (processedMessage) {
+              logger.log('[RTM] Adding to pending messages:', {
+                type: processedMessage.type,
+                isOwn: processedMessage.isOwn
+              });
               setPendingRtmMessages(prev => [...prev, processedMessage]);
+            } else {
+              logger.log('[RTM] Message filtered out (commands only)');
             }
           }
           return;
@@ -349,15 +398,17 @@ export const RtmChatPanel = ({
               if (parsedMsg.object === "user.transcription" || parsedMsg.object === "assistant.transcription") {
                 const isUserTranscription = parsedMsg.object === "user.transcription";
                 
-                // Skip if we've already processed this message
-                const messageKey = `${parsedMsg.object}-${parsedMsg.turn_id}-${parsedMsg.message_id || timestamp}`;
-                if (parsedMsg.message_id && processedMessageIds.has(messageKey)) {
-                  logger.log("Skipping duplicate binary message:", messageKey);
+                // Check for duplicates
+                const isDuplicate = pendingRtmMessages.some(msg => 
+                  msg.content === parsedMsg.text &&
+                  msg.type === (isUserTranscription ? 'user' : 'agent') &&
+                  Math.abs(msg.time - timestamp) < 2000
+                );
+                
+                if (isDuplicate) {
+                  logger.log('[RTM] Skipping duplicate binary transcription:', parsedMsg.text);
                   return;
                 }
-                
-                // Mark as processed
-                setProcessedMessageIds(prev => new Set([...prev, messageKey]));
                 
                 messageToProcess = {
                   type: isUserTranscription ? 'user' : 'agent',
@@ -367,7 +418,8 @@ export const RtmChatPanel = ({
                   userId: isUserTranscription ? String(agoraConfig.uid) : publisher,
                   isOwn: isUserTranscription,
                   turn_id: parsedMsg.turn_id,
-                  message_id: parsedMsg.message_id
+                  message_id: parsedMsg.message_id,
+                  fromRtmListener: true
                 };
               }
               else if (parsedMsg.text !== undefined) {
@@ -378,7 +430,8 @@ export const RtmChatPanel = ({
                   contentType: 'text',
                   userId: publisher,
                   isOwn: !isFromAgentByPublisher,
-                  turn_id: parsedMsg.turn_id
+                  turn_id: parsedMsg.turn_id,
+                  fromRtmListener: true
                 };
               }
             } catch {
@@ -389,7 +442,8 @@ export const RtmChatPanel = ({
                 content: decodedMessage,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgentByPublisher
+                isOwn: !isFromAgentByPublisher,
+                fromRtmListener: true
               };
             }
             
@@ -412,10 +466,10 @@ export const RtmChatPanel = ({
           }
         }
       } catch (error) {
-        logger.error("Error processing RTM message:", error);
+        logger.error("[RTM] Error processing RTM message:", error);
       }
     },
-    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated, processedMessageIds, pendingRtmMessages]
+    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated, pendingRtmMessages, rtmReceivedMessages]
   );
 
   // Initialize MessageEngine for subtitles with message processor
@@ -498,26 +552,47 @@ export const RtmChatPanel = ({
     };
   }, [agoraClient, isConnectInitiated, processMessage, isPureChatMode, urlParams]);
 
+  // Process messages from rtmMessages prop (skip if already received via listener)
   useEffect(() => {
     if (rtmMessages && rtmMessages.length > 0) {
       const newMessages = rtmMessages.filter(
         (msg) =>
+          // Skip if we already have this message
           !pendingRtmMessages.some(
             (pending) =>
               pending.time === msg.time &&
               pending.content === msg.content &&
               pending.userId === msg.userId
+          ) &&
+          // Skip if this came from RTM listener (marked with fromRtmListener)
+          !pendingRtmMessages.some(
+            (pending) =>
+              pending.fromRtmListener &&
+              pending.content === msg.content &&
+              Math.abs(pending.time - msg.time) < 2000
           )
       );
 
       if (newMessages.length > 0) {
+        logger.log('[RTM] Processing messages from rtmMessages prop:', newMessages.length);
+        
         // Process all new messages through shared logic
         const processedMessages = newMessages
-          .map(msg => processRtmMessage(msg, agoraConfig.uid, processMessage, urlParams, isConnectInitiated))
+          .map(msg => {
+            // Mark these as NOT from RTM listener
+            const processedMsg = processRtmMessage(
+              { ...msg, fromRtmListener: false }, 
+              agoraConfig.uid, 
+              processMessage, 
+              urlParams, 
+              isConnectInitiated
+            );
+            return processedMsg;
+          })
           .filter(msg => msg !== null); // Remove messages that were filtered out (commands only)
 
         if (processedMessages.length > 0) {
-          logger.log("Adding processed messages:", processedMessages);
+          logger.log("Adding processed messages from rtmMessages:", processedMessages);
           setPendingRtmMessages((prev) => [...prev, ...processedMessages]);
         } else {
           logger.log("All new messages were command-only, none added to chat");
@@ -909,10 +984,10 @@ export const RtmChatPanel = ({
       : "No messages";
   };
 
-  // Clean up processed message IDs when component unmounts
+  // Clean up tracking sets when component unmounts
   useEffect(() => {
     return () => {
-      setProcessedMessageIds(new Set());
+      setRtmReceivedMessages(new Set());
     };
   }, []);
 
