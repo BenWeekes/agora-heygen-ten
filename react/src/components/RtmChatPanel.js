@@ -12,7 +12,9 @@ const logger = new Logger('[RtmChatPanel]');
  * Handles command processing and determines if message should be displayed in chat
  */
 const processRtmMessage = (message, currentUserId, processMessage, urlParams, isConnectInitiated) => {
-  const isFromAgent = message.type === 'agent' || message.userId !== String(currentUserId) || !message.isOwn;
+  // Use the message type field to determine if it's from agent
+  const isFromAgent = message.type === 'agent' || 
+                     (message.type !== 'user' && message.userId !== String(currentUserId) && !message.isOwn);
   
   // Only process commands for agent messages with text content
   if (isFromAgent && processMessage && message.contentType === 'text') {
@@ -62,6 +64,7 @@ export const RtmChatPanel = ({
   const [pendingRtmMessages, setPendingRtmMessages] = useState([]);
   const [preservedSubtitleMessages, setPreservedSubtitleMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const [processedMessageIds, setProcessedMessageIds] = useState(new Set()); // Track processed message IDs
   const rtmMessageEndRef = useRef(null);
   const messageEngineRef = useRef(null);
 
@@ -128,7 +131,6 @@ export const RtmChatPanel = ({
         
         await rtmClient.publish(publishTarget, messagePayload, options);
    
-        //await rtmClient.publish(publishTarget, message.trim(), options);
         logger.log("Message sent successfully via direct send to:", publishTarget);
 
         // Only add to local history if:
@@ -181,10 +183,11 @@ export const RtmChatPanel = ({
           currentUserId: agoraConfig.uid,
           messageType,
           timestamp,
-          message: typeof message === 'string' ? message : '[binary data]'
+          message: typeof message === 'string' ? message.substring(0, 100) : '[binary data]'
         });
         
-        const isFromAgent = publisher !== String(agoraConfig.uid);
+        // Default to checking if it's from agent based on publisher
+        const isFromAgentByPublisher = publisher !== String(agoraConfig.uid);
         
         if (messageType === "STRING") {
           let messageToProcess = null;
@@ -192,9 +195,37 @@ export const RtmChatPanel = ({
           try {
             const parsedMsg = JSON.parse(message);
             
+            // Check for transcription messages with explicit object type
+            if (parsedMsg.object === "user.transcription" || parsedMsg.object === "assistant.transcription") {
+              // Use the object field to determine message type
+              const isUserTranscription = parsedMsg.object === "user.transcription";
+              const isAssistantTranscription = parsedMsg.object === "assistant.transcription";
+              
+              // Skip if we've already processed this message
+              const messageKey = `${parsedMsg.object}-${parsedMsg.turn_id}-${parsedMsg.message_id || timestamp}`;
+              if (parsedMsg.message_id && processedMessageIds.has(messageKey)) {
+                logger.log("Skipping duplicate message:", messageKey);
+                return;
+              }
+              
+              // Mark as processed
+              setProcessedMessageIds(prev => new Set([...prev, messageKey]));
+              
+              // Create message with correct type based on transcription object
+              messageToProcess = {
+                type: isUserTranscription ? 'user' : 'agent',
+                time: timestamp || Date.now(),
+                content: parsedMsg.text || '',
+                contentType: 'text',
+                userId: isUserTranscription ? String(agoraConfig.uid) : publisher,
+                isOwn: isUserTranscription,
+                turn_id: parsedMsg.turn_id,
+                message_id: parsedMsg.message_id
+              };
+            }
             // Handle typing indicators
-            if (parsedMsg.type === "typing_start") {
-              if (isFromAgent) {
+            else if (parsedMsg.type === "typing_start") {
+              if (isFromAgentByPublisher) {
                 setTypingUsers(prev => new Set([...prev, publisher]));
                 setTimeout(() => {
                   setTypingUsers(prev => {
@@ -206,58 +237,57 @@ export const RtmChatPanel = ({
               }
               return;
             }
-            
             // Handle image messages
-            if (parsedMsg.img) {
+            else if (parsedMsg.img) {
               messageToProcess = {
-                type: isFromAgent ? 'agent' : 'user',
+                type: isFromAgentByPublisher ? 'agent' : 'user',
                 time: timestamp || Date.now(),
                 content: parsedMsg.img,
                 contentType: 'image',
                 userId: publisher,
-                isOwn: !isFromAgent
+                isOwn: !isFromAgentByPublisher
               };
             }
-            // Handle text messages from JSON
+            // Handle text messages from JSON (without explicit transcription type)
             else if (parsedMsg.text !== undefined) {
               messageToProcess = {
-                type: isFromAgent ? 'agent' : 'user',
+                type: isFromAgentByPublisher ? 'agent' : 'user',
                 time: timestamp || Date.now(),
                 content: parsedMsg.text,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgent,
+                isOwn: !isFromAgentByPublisher,
                 turn_id: parsedMsg.turn_id
               };
             }
             // Handle other JSON messages
             else {
               messageToProcess = {
-                type: isFromAgent ? 'agent' : 'user',
+                type: isFromAgentByPublisher ? 'agent' : 'user',
                 time: timestamp || Date.now(),
                 content: message,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgent
+                isOwn: !isFromAgentByPublisher
               };
             }
             
           } catch (parseError) {
             // Not valid JSON, treat as plain text
             messageToProcess = {
-              type: isFromAgent ? 'agent' : 'user',
+              type: isFromAgentByPublisher ? 'agent' : 'user',
               time: timestamp || Date.now(),
               content: message,
               contentType: 'text',
               userId: publisher,
-              isOwn: !isFromAgent
+              isOwn: !isFromAgentByPublisher
             };
           }
           
           // Process the message through shared logic
           if (messageToProcess) {
             // Clear typing indicator for any real message from agent
-            if (isFromAgent) {
+            if (messageToProcess.type === 'agent') {
               setTypingUsers(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(publisher);
@@ -287,7 +317,7 @@ export const RtmChatPanel = ({
             const decodedMessage = decoder.decode(message);
             
             // Clear typing indicator
-            if (isFromAgent) {
+            if (isFromAgentByPublisher) {
               setTypingUsers(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(publisher);
@@ -300,26 +330,51 @@ export const RtmChatPanel = ({
             try {
               const parsedMsg = JSON.parse(decodedMessage);
               
-              if (parsedMsg.text !== undefined) {
+              // Check for transcription messages with explicit object type
+              if (parsedMsg.object === "user.transcription" || parsedMsg.object === "assistant.transcription") {
+                const isUserTranscription = parsedMsg.object === "user.transcription";
+                
+                // Skip if we've already processed this message
+                const messageKey = `${parsedMsg.object}-${parsedMsg.turn_id}-${parsedMsg.message_id || timestamp}`;
+                if (parsedMsg.message_id && processedMessageIds.has(messageKey)) {
+                  logger.log("Skipping duplicate binary message:", messageKey);
+                  return;
+                }
+                
+                // Mark as processed
+                setProcessedMessageIds(prev => new Set([...prev, messageKey]));
+                
                 messageToProcess = {
-                  type: isFromAgent ? 'agent' : 'user',
+                  type: isUserTranscription ? 'user' : 'agent',
+                  time: timestamp || Date.now(),
+                  content: parsedMsg.text || '',
+                  contentType: 'text',
+                  userId: isUserTranscription ? String(agoraConfig.uid) : publisher,
+                  isOwn: isUserTranscription,
+                  turn_id: parsedMsg.turn_id,
+                  message_id: parsedMsg.message_id
+                };
+              }
+              else if (parsedMsg.text !== undefined) {
+                messageToProcess = {
+                  type: isFromAgentByPublisher ? 'agent' : 'user',
                   time: timestamp || Date.now(),
                   content: parsedMsg.text,
                   contentType: 'text',
                   userId: publisher,
-                  isOwn: !isFromAgent,
+                  isOwn: !isFromAgentByPublisher,
                   turn_id: parsedMsg.turn_id
                 };
               }
             } catch {
               // Not valid JSON, use decoded message as plain text
               messageToProcess = {
-                type: isFromAgent ? 'agent' : 'user',
+                type: isFromAgentByPublisher ? 'agent' : 'user',
                 time: timestamp || Date.now(),
                 content: decodedMessage,
                 contentType: 'text',
                 userId: publisher,
-                isOwn: !isFromAgent
+                isOwn: !isFromAgentByPublisher
               };
             }
             
@@ -345,7 +400,7 @@ export const RtmChatPanel = ({
         logger.error("Error processing RTM message:", error);
       }
     },
-    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated]
+    [agoraConfig.uid, processMessage, urlParams, isConnectInitiated, processedMessageIds]
   );
 
   // Initialize MessageEngine for subtitles with message processor
@@ -473,7 +528,7 @@ export const RtmChatPanel = ({
           const validTime =
             msg.time && new Date(msg.time).getFullYear() > 1971 ? msg.time : Date.now();
           return {
-            id: `typed-${msg.userId}-${validTime}`,
+            id: `typed-${msg.userId}-${validTime}-${index}`,
             ...msg,
             time: validTime,
             isSubtitle: false,
@@ -594,7 +649,7 @@ export const RtmChatPanel = ({
         const validTime =
           msg.time && new Date(msg.time).getFullYear() > 1971 ? msg.time : now;
         return {
-          id: `typed-${msg.userId}-${validTime}`,
+          id: `typed-${msg.type}-${msg.userId}-${validTime}-${index}`,
           ...msg,
           time: validTime,
           isSubtitle: false,
@@ -604,22 +659,25 @@ export const RtmChatPanel = ({
 
     const allMessageMap = new Map();
 
+    // Add subtitle messages first
     subtitleMessages.forEach((msg) => {
-      const key = msg.message_id || `${msg.userId}-${msg.turn_id}`;
+      const key = msg.message_id || `${msg.type}-${msg.userId}-${msg.turn_id}-${msg.time}`;
       allMessageMap.set(key, msg);
     });
 
+    // Add typed messages, avoiding duplicates based on content and type
     typedMessages.forEach((msg) => {
-      const key = `typed-${msg.userId}-${msg.time}`;
+      const key = `typed-${msg.type}-${msg.userId}-${msg.time}`;
 
-      const hasSimilarSubtitle = Array.from(allMessageMap.values()).some(
+      // Check for duplicate based on content, type, and similar timing
+      const hasSimilarMessage = Array.from(allMessageMap.values()).some(
         (existing) =>
-          existing.isSubtitle &&
-          existing.userId === msg.userId &&
-          existing.content.trim() === msg.content.trim()
+          existing.type === msg.type &&
+          existing.content.trim() === msg.content.trim() &&
+          Math.abs(existing.time - msg.time) < 1000 // Within 1 second
       );
 
-      if (!hasSimilarSubtitle) {
+      if (!hasSimilarMessage) {
         allMessageMap.set(key, msg);
       }
     });
@@ -792,6 +850,13 @@ export const RtmChatPanel = ({
       ? "No messages yet. Start the conversation by speaking or typing!"
       : "No messages";
   };
+
+  // Clean up processed message IDs when component unmounts
+  useEffect(() => {
+    return () => {
+      setProcessedMessageIds(new Set());
+    };
+  }, []);
 
   return (
     <div className={`rtm-container  ${isFullscreen ? "hidden": ""}`} >
